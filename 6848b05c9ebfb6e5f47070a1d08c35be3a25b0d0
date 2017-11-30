@@ -1,0 +1,15 @@
+Verified+1: Christopher Ferris <chris.ferris@gmail.com>
+Code-Review+1: David Enyeart <enyeart@us.ibm.com>
+Code-Review+1: Kostas Christidis <kostas@gmail.com>
+Code-Review+1: Jason Yellick <jyellick@us.ibm.com>
+Code-Review+1: Gari Singh <gari.r.singh@gmail.com>
+Code-Review+2: Christopher Ferris <chris.ferris@gmail.com>
+Code-Review+1: Artem Barger <bartem@il.ibm.com>
+Code-Review+1: Keith Smith <keithsmithlfid@gmail.com>
+Code-Review+1: Binh Nguyen <binh1010010110@gmail.com>
+Code-Review+2: Yacov Manevich <yacovm@il.ibm.com>
+Submitted-by: Yacov Manevich <yacovm@il.ibm.com>
+Submitted-at: Thu, 30 Nov 2017 17:22:51 +0000
+Reviewed-on: https://gerrit.hyperledger.org/r/15669
+Project: fabric-chaincode-evm
+Branch: refs/heads/master
