@@ -18,14 +18,12 @@ import (
 	"github.com/hyperledger/burrow/execution/evm"
 	"github.com/hyperledger/burrow/logging"
 	"github.com/hyperledger/fabric-chaincode-evm/statemanager"
-	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	"github.com/hyperledger/fabric/protos/msp"
 	pb "github.com/hyperledger/fabric/protos/peer"
 	"golang.org/x/crypto/sha3"
 )
 
-var logger = flogging.MustGetLogger("evmscc")
 var evmLogger = logging.NewNoopLogger()
 
 func New() shim.Chaincode {
@@ -35,7 +33,6 @@ func New() shim.Chaincode {
 type EvmChaincode struct{}
 
 func (evmscc *EvmChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
-	logger.Debugf("Init evmscc, it's no-op")
 	return shim.Success(nil)
 }
 
@@ -85,7 +82,6 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 	vm := evm.NewVM(state, newParams(), callerAddr, nil, evmLogger)
 
 	if calleeAddr == account.ZeroAddress {
-		logger.Debugf("Deploy contract")
 
 		seqKey := binary.RightPadWord256([]byte("sequence"))
 		s, err := state.GetStorage(callerAddr, seqKey)
@@ -101,7 +97,6 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 		}
 
 		// Update contract seq
-		logger.Debugf("Contract sequence number = %d", seq)
 		state.SetStorage(callerAddr, seqKey, binary.Uint64ToWord256(seq+1))
 
 		contractAddr := account.NewContractAddress(callerAddr, seq)
@@ -123,7 +118,6 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 		// return encoded hex bytes for human-readability
 		return shim.Success([]byte(hex.EncodeToString(contractAddr.Bytes())))
 	} else {
-		logger.Debugf("Invoke contract at %x", calleeAddr.Bytes())
 
 		calleeAcct, err := state.GetAccount(calleeAddr)
 		if err != nil {
