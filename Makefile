@@ -38,7 +38,7 @@ EXECUTABLES ?= go docker git curl
 K := $(foreach exec,$(EXECUTABLES),\
 	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
 
-all: checks evmscc-linux
+all: checks evmscc-linux docker
 
 checks: basic-checks unit-test
 
@@ -67,32 +67,21 @@ linter: check-deps
 	@echo "LINT: Running code checks.."
 	./scripts/golinter.sh
 
-check-deps: 
+check-deps:
 	@echo "DEP: Checking for dependency issues.."
 	./scripts/check_deps.sh
 
 changelog:
 	./scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
 
-DRUN = docker run -i --rm $(DOCKER_RUN_FLAGS) -w /opt/gopath/src/$(EVMSCC)
+.PHONY: docker
+docker: 
+	docker build . -t hyperledger/fabric-peer-evm:latest
 
 evmscc-linux: $(BUILD_DIR)/linux/lib/evmscc.so
 $(BUILD_DIR)/linux/lib/evmscc.so:
-	@mkdir -p $(@D)
-	$(eval TMPDIR := $(shell mktemp -d /tmp/evmscc-build.XXXXX))
-	@echo $(TMPDIR)
-	@rsync -az --exclude=".*/" --exclude=".*" --exclude="build/" $(GOPATH)/src/$(FABRIC) $(TMPDIR)
-	@rsync -az --exclude=".*/" --exclude=".*" --exclude="build/" $(GOPATH)/src/$(EVMSCC) $(TMPDIR)
-	@echo "Building $@"
-	@$(DRUN) \
-		-v $(TMPDIR)/fabric-chaincode-evm:/opt/gopath/src/$(EVMSCC) \
-		-v $(TMPDIR)/fabric:/opt/gopath/src/$(FABRIC) \
-		-v $(abspath $(@D)):$(LIB_DIR) \
-		-v $(PWD)/scripts/build.sh:/opt/build.sh \
-		-e LIB_DIR=$(LIB_DIR) \
-		$(BASE_DOCKER_NS)/fabric-baseimage:$(BASE_DOCKER_TAG) \
-		bash -c '/opt/build.sh /opt/gopath/src/$(FABRIC) /opt/gopath/src/$(EVMSCC)'
-	@rm -rf $(TMPDIR)
+	@echo "Building $@.."
+	go build -o $@ -buildmode=plugin ./plugin
 
 .PHONY: clean
 clean:
