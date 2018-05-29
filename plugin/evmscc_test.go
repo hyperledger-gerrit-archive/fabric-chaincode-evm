@@ -1,6 +1,5 @@
 /*
 Copyright IBM Corp. All Rights Reserved.
-
 SPDX-License-Identifier: Apache-2.0
 */
 
@@ -39,6 +38,7 @@ var _ = Describe("Evmscc", func() {
 		stub       *mocks.MockStub
 		fakeLedger map[string][]byte
 	)
+
 	BeforeEach(func() {
 		evmscc = plugin.New()
 		stub = &mocks.MockStub{}
@@ -64,6 +64,7 @@ var _ = Describe("Evmscc", func() {
 		It("returns an OK response", func() {
 			res := evmscc.Init(stub)
 			Expect(res.Status).To(Equal(int32(shim.OK)))
+			Expect(res.Payload).To(Equal([]byte(nil))) //added this
 		})
 	})
 
@@ -87,21 +88,21 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 
 			/* Sample App from https://solidity.readthedocs.io/en/develop/introduction-to-smart-contracts.html#storage
 			   pragma solidity ^0.4.0;
-
 			   contract SimpleStorage {
 			     uint storedData;
-
 			   	function set(uint x) public {
 			   	  storedData = x;
 			   	}
-
 			   	function get() public constant returns (uint) {
 			   	  return storedData;
 			   	}
 			   }
 			*/
+
 			deployCode  = []byte("6060604052341561000f57600080fd5b60d38061001d6000396000f3006060604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c14606e575b600080fd5b3415605857600080fd5b606c60048080359060200190919050506094565b005b3415607857600080fd5b607e609e565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820122f55f799d70b5f6dbfd4312efb65cdbfaacddedf7c36249b8b1e915a8dd85b0029")
+			
 			runtimeCode = "6060604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff16806360fe47b114604e5780636d4ce63c14606e575b600080fd5b3415605857600080fd5b606c60048080359060200190919050506094565b005b3415607857600080fd5b607e609e565b6040518082815260200191505060405180910390f35b8060008190555050565b600080549050905600a165627a7a72305820122f55f799d70b5f6dbfd4312efb65cdbfaacddedf7c36249b8b1e915a8dd85b0029"
+			
 		)
 
 		BeforeEach(func() {
@@ -126,9 +127,11 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 		Context("when a contract has already been deployed", func() {
 			var (
 				contractAddress account.Address
+				//method hashes
 				SET             = "60fe47b1"
 				GET             = "6d4ce63c"
 			)
+
 			BeforeEach(func() {
 				// zero address, and deploy code is contract creation
 				stub.GetArgsReturns([][]byte{[]byte(account.ZeroAddress.String()), deployCode})
@@ -193,16 +196,67 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 			})
 		})
 
+		//made some modifications here 
 		Context("when less than 2 args are given", func() {
-			BeforeEach(func() {
-				stub.GetArgsReturns([][]byte{[]byte("arg1")})
+
+			Context("when only one argument is given", func() {
+
+				Context("when the argument is \"account\"", func() {
+
+					Context("when account is invoked", func() {
+
+						var (
+							callerAddress account.Address
+							err error
+						)
+			
+						BeforeEach(func() {
+							stub.GetArgsReturns([][]byte{[]byte("account")})
+							stub.GetCreatorReturns(creator, nil)
+							si := &msp.SerializedIdentity{IdBytes: []byte(user0Cert)}
+							callerAddress, err = identityToAddr(si.IdBytes)
+						})
+
+						It("will return the caller address of the contract", func() {
+							res := evmscc.Invoke(stub)
+							Expect(res.Status).To(Equal(int32(shim.OK)))
+							Expect(string(res.Payload)).To(Equal(callerAddress.String())) 
+						})
+
+					})
+
+				})
+
+				Context("when the argument is not \"account\"", func() {
+		
+					BeforeEach(func() {
+						stub.GetArgsReturns([][]byte{[]byte("arg1")})
+					})
+
+					It("returns an error", func() {
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.ERROR)))
+						Expect(res.Message).To(ContainSubstring("expects 2 args"))
+					})
+
+				})
+
 			})
 
-			It("returns an error", func() {
-				res := evmscc.Invoke(stub)
-				Expect(res.Status).To(Equal(int32(shim.ERROR)))
-				Expect(res.Message).To(ContainSubstring("expects 2 args"))
+			Context("when no argument is given", func() {
+
+				BeforeEach(func() {
+					stub.GetArgsReturns([][]byte{[]byte("")})
+				})
+
+				It("returns an error", func() {
+					res := evmscc.Invoke(stub)
+					Expect(res.Status).To(Equal(int32(shim.ERROR)))
+					Expect(res.Message).To(ContainSubstring("expects 2 args"))
+				})
+
 			})
+
 		})
 
 		Describe("Voting DApp", func() {
@@ -347,6 +401,20 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 				vote            = "0121b93f"
 				winnerName      = "e2ba53f0"
 
+				//I added:
+				voters          = "a3ec138d"
+
+				/*
+				Found all the method hashes from Remix IDE:
+				"2e4176cf": "chairperson()",
+    				"5c19a95c": "delegate(address)",
+    				"9e7b8d61": "giveRightToVote(address)",
+    				"013cf08b": "proposals(uint256)",
+    				"0121b93f": "vote(uint256)",
+    				"a3ec138d": "voters(address)",
+    				"e2ba53f0": "winnerName()",
+    				"609ff1bd": "winningProposal()"*/
+
 				user1Cert = `-----BEGIN CERTIFICATE-----
 MIICGTCCAcCgAwIBAgIRAOdmptMzz5y0A9GOgFLxRNcwCgYIKoZIzj0EAwIwczEL
 MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
@@ -437,6 +505,16 @@ H8GZeN2ifTyJzzGo
 						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount+3), "`vote` should perform 3 writes: sender.voted, sender.vote, voteCount")
 					})
 
+					//added the following "It" portion
+					It("sets the variables of voter 1 (user1) properly", func() {
+						user1addr, err := identityToAddr([]byte(user1Cert))
+						Expect(err).ToNot(HaveOccurred())
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(voters + hex.EncodeToString(user1addr.Word256().Bytes()))})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+					})
+
 					It("increments vote count of proposal 'a'", func() {
 						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(proposals + "0000000000000000000000000000000000000000000000000000000000000000")})
 						res := evmscc.Invoke(stub)
@@ -460,7 +538,7 @@ H8GZeN2ifTyJzzGo
 						baseCallCount = stub.PutStateCallCount()
 						Expect(res.Status).To(Equal(int32(shim.OK)))
 						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount), "require(!sender.voted) should fail, therefore NO write should be performed")
-					})
+					}) //doubt
 
 					It("does not increment vote count of proposal 'a'", func() {
 						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(proposals + "0000000000000000000000000000000000000000000000000000000000000000")})
@@ -468,6 +546,148 @@ H8GZeN2ifTyJzzGo
 						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount), "query should not write to ledger")
 						Expect(res.Status).To(Equal(int32(shim.OK)))
 						Expect(hex.EncodeToString(res.Payload)).To(Equal("61000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+					})
+				})
+			})
+
+			//added the following "Context"
+			Context("when user1 and user2 are given right to vote", func() {
+				var baseCallCount int
+
+				BeforeEach(func() {
+					user1Addr, err := identityToAddr([]byte(user1Cert))
+					Expect(err).ToNot(HaveOccurred())
+					stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(giveRightToVote + hex.EncodeToString(user1Addr.Word256().Bytes()))})
+					res := evmscc.Invoke(stub)
+					Expect(res.Status).To(Equal(int32(shim.OK)))		
+
+					user2Addr, err := identityToAddr([]byte(user2Cert))
+					Expect(err).ToNot(HaveOccurred())
+					stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(giveRightToVote + hex.EncodeToString(user2Addr.Word256().Bytes()))})
+					res1 := evmscc.Invoke(stub)
+					Expect(res1.Status).To(Equal(int32(shim.OK)))
+
+					baseCallCount = stub.PutStateCallCount()
+				})
+
+				Context("when user1 and user2 both vote for proposal 'b'", func() {
+					BeforeEach(func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(vote + "0000000000000000000000000000000000000000000000000000000000000001")})
+						stub.GetCreatorReturns(user1, nil)
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount+3), "`vote` should perform 3 writes: sender.voted, sender.vote, voteCount")
+
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(vote + "0000000000000000000000000000000000000000000000000000000000000001")})
+						stub.GetCreatorReturns(user2, nil)
+						res1 := evmscc.Invoke(stub)
+						Expect(res1.Status).To(Equal(int32(shim.OK)))
+						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount+6), "`vote` should perform 3 more writes: sender.voted, sender.vote, voteCount")
+					})
+
+					It("sets the variables of voter 1 (user1) as well as voter 2 (user2) properly", func() {
+						user1addr, err := identityToAddr([]byte(user1Cert))
+						Expect(err).ToNot(HaveOccurred())
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(voters + hex.EncodeToString(user1addr.Word256().Bytes()))})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"))
+					
+						user2addr, err := identityToAddr([]byte(user2Cert))
+						Expect(err).ToNot(HaveOccurred())
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(voters + hex.EncodeToString(user2addr.Word256().Bytes()))})
+						res1 := evmscc.Invoke(stub)
+						Expect(res1.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res1.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"))
+					
+					})
+
+					It("increments vote count of proposal 'b' by 2", func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(proposals + "0000000000000000000000000000000000000000000000000000000000000001")})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("62000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002"))
+					})
+
+					It("should make proposal 'b' winner", func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(winnerName)})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("6200000000000000000000000000000000000000000000000000000000000000"))
+					})
+				})
+			})
+
+			//added the following "Context"
+			Context("when both user1 and user2 are given rights to vote", func() {
+				var baseCallCount int
+
+				BeforeEach(func() {
+					user1Addr, err := identityToAddr([]byte(user1Cert))
+					Expect(err).ToNot(HaveOccurred())
+					stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(giveRightToVote + hex.EncodeToString(user1Addr.Word256().Bytes()))})
+					res := evmscc.Invoke(stub)
+					Expect(res.Status).To(Equal(int32(shim.OK)))
+
+					user2Addr, err := identityToAddr([]byte(user2Cert))
+					Expect(err).ToNot(HaveOccurred())
+					stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(giveRightToVote + hex.EncodeToString(user2Addr.Word256().Bytes()))})
+					res1 := evmscc.Invoke(stub)
+					Expect(res1.Status).To(Equal(int32(shim.OK)))
+
+					baseCallCount = stub.PutStateCallCount()
+				})
+
+				Context("when user1 votes for proposal 'a' and user2 votes for proposal 'b'", func() {
+					BeforeEach(func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(vote + "0000000000000000000000000000000000000000000000000000000000000000")})
+						stub.GetCreatorReturns(user1, nil)
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount+3), "`vote` should perform 3 writes: sender.voted, sender.vote, voteCount")
+
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(vote + "0000000000000000000000000000000000000000000000000000000000000001")})
+						stub.GetCreatorReturns(user2, nil)
+						res1 := evmscc.Invoke(stub)
+						Expect(res1.Status).To(Equal(int32(shim.OK)))
+						Expect(stub.PutStateCallCount()).To(Equal(baseCallCount+6), "`vote` should perform 3 more writes: sender.voted, sender.vote, voteCount")
+					})
+
+					It("sets the variables of voter 1 (user1) as well as voter 2 (user2) properly", func() {
+						user1addr, err := identityToAddr([]byte(user1Cert))
+						Expect(err).ToNot(HaveOccurred())
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(voters + hex.EncodeToString(user1addr.Word256().Bytes()))})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"))
+					
+						user2addr, err := identityToAddr([]byte(user2Cert))
+						Expect(err).ToNot(HaveOccurred())
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(voters + hex.EncodeToString(user2addr.Word256().Bytes()))})
+						res1 := evmscc.Invoke(stub)
+						Expect(res1.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res1.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"))
+					
+					})
+
+					It("increments vote counts of proposal 'a' as well as 'b'", func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(proposals + "0000000000000000000000000000000000000000000000000000000000000000")})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("61000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"))
+
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(proposals + "0000000000000000000000000000000000000000000000000000000000000001")})
+						res1 := evmscc.Invoke(stub)
+						Expect(res1.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res1.Payload)).To(Equal("62000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001"))
+					})
+
+					//discuss
+					It("should still make proposal 'a' winner", func() {
+						stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(winnerName)})
+						res := evmscc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(hex.EncodeToString(res.Payload)).To(Equal("6100000000000000000000000000000000000000000000000000000000000000"))
 					})
 				})
 			})
