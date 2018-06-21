@@ -15,8 +15,10 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/burrow/account"
 	"github.com/hyperledger/burrow/binary"
+	"github.com/hyperledger/burrow/event"
 	"github.com/hyperledger/burrow/execution/evm"
 	"github.com/hyperledger/burrow/logging"
+	evm_event "github.com/hyperledger/fabric-chaincode-evm/event"
 	"github.com/hyperledger/fabric-chaincode-evm/statemanager"
 	"github.com/hyperledger/fabric/common/flogging"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
@@ -84,6 +86,10 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 	state := statemanager.NewStateManager(stub)
 	vm := evm.NewVM(state, newParams(), callerAddr, nil, evmLogger)
 
+	emitter := event.NewEmitter(evmLogger)
+	evmgr := evm_event.NewEventManager(stub, emitter)
+	vm.SetPublisher(evmgr)
+
 	if calleeAddr == account.ZeroAddress {
 		logger.Debugf("Deploy contract")
 
@@ -120,6 +126,11 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 			return shim.Error(fmt.Sprintf("failed to update contract account: %s", err.Error()))
 		}
 
+		er := evmgr.Flush(string(args[1][0:8]))
+		if er != nil {
+			return shim.Error(fmt.Sprintf("error in Flush: %s", er.Error()))
+		}
+
 		// return encoded hex bytes for human-readability
 		return shim.Success([]byte(hex.EncodeToString(contractAddr.Bytes())))
 	} else {
@@ -133,6 +144,11 @@ func (evmscc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response
 		output, err := vm.Call(callerAcct, account.AsMutableAccount(calleeAcct), calleeAcct.Code().Bytes(), input, 0, &gas)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("failed to execute contract: %s", err.Error()))
+		}
+
+		er := evmgr.Flush(string(args[1][0:8]))
+		if er != nil {
+			return shim.Error(fmt.Sprintf("error in Flush: %s", er.Error()))
 		}
 
 		return shim.Success(output)
