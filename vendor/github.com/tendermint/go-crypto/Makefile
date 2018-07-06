@@ -1,69 +1,99 @@
-.PHONEY: all test install get_vendor_deps ensure_tools codegen wordlist
-
 GOTOOLS = \
-	github.com/Masterminds/glide \
-	github.com/jteeuwen/go-bindata/go-bindata \
-	github.com/alecthomas/gometalinter
+	github.com/golang/dep/cmd/dep \
+	# gopkg.in/alecthomas/gometalinter.v2 \
 
-REPO:=github.com/tendermint/go-crypto
+GOTOOLS_CHECK = dep #gometalinter.v2
 
-all: get_vendor_deps metalinter_test test
+all: check get_vendor_deps build test install
+
+check: check_tools
+
+
+########################################
+###  Build
+
+# Command to generate the workd list (kept here for documentation purposes only):
+wordlist:
+	# To re-generate wordlist.go run:
+	# go-bindata -ignore ".*\.go" -o keys/words/wordlist/wordlist.go -pkg "wordlist" keys/words/wordlist/...
+
+build: wordlist
+	# Nothing else to build!
+
+install:
+	# Nothing to install!
+
+
+########################################
+### Tools & dependencies
+
+check_tools:
+	@# https://stackoverflow.com/a/25668869
+	@echo "Found tools: $(foreach tool,$(GOTOOLS_CHECK),\
+        $(if $(shell which $(tool)),$(tool),$(error "No $(tool) in PATH")))"
+
+get_tools:
+	@echo "--> Installing tools"
+	go get -u -v $(GOTOOLS)
+	#@gometalinter.v2 --install
+
+update_tools:
+	@echo "--> Updating tools"
+	@go get -u $(GOTOOLS)
+
+get_vendor_deps:
+	@rm -rf vendor/
+	@echo "--> Running dep ensure"
+	@dep ensure
+
+
+########################################
+### Testing
 
 test:
-	go test -p 1 `glide novendor`
+	go test -p 1 $(shell go list ./... | grep -v vendor)
 
-get_vendor_deps: ensure_tools
-	@rm -rf vendor/
-	@echo "--> Running glide install"
-	@glide install
+########################################
+### Formatting, linting, and vetting
 
-ensure_tools:
-	go get $(GOTOOLS)
+fmt:
+	@go fmt ./...
 
-wordlist:
-	go-bindata -ignore ".*\.go" -o keys/wordlist/wordlist.go -pkg "wordlist" keys/wordlist/...
-
-prepgen: install
-	go install ./vendor/github.com/btcsuite/btcutil/base58
-	go install ./vendor/github.com/stretchr/testify/assert
-	go install ./vendor/github.com/stretchr/testify/require
-	go install ./vendor/golang.org/x/crypto/bcrypt
-
-codegen:
-	@echo "--> regenerating all interface wrappers"
-	@gen
-	@echo "Done!"
-
-metalinter: ensure_tools
-	@gometalinter --install
-	gometalinter --vendor --deadline=600s --enable-all --disable=lll ./...
-
-metalinter_test: ensure_tools
-	@gometalinter --install
-	gometalinter --vendor --deadline=600s --disable-all  \
-		--enable=deadcode \
-		--enable=gas \
-		--enable=goconst \
-		--enable=gocyclo \
-		--enable=gosimple \
-	 	--enable=ineffassign \
-	   	--enable=interfacer \
+metalinter:
+	@echo "==> Running linter"
+	gometalinter.v2 --vendor --deadline=600s --disable-all  \
 		--enable=maligned \
+		--enable=deadcode \
+		--enable=goconst \
+		--enable=goimports \
+		--enable=gosimple \
+		--enable=ineffassign \
 		--enable=megacheck \
-	 	--enable=misspell \
-		--enable=safesql \
+		--enable=misspell \
 		--enable=staticcheck \
+		--enable=safesql \
 		--enable=structcheck \
-	   	--enable=unconvert \
+		--enable=unconvert \
 		--enable=unused \
-		--enable=vetshadow \
-		--enable=vet \
 		--enable=varcheck \
+		--enable=vetshadow \
 		./...
-
+		#--enable=gas \
 		#--enable=dupl \
 		#--enable=errcheck \
-		#--enable=goimports \
+		#--enable=gocyclo \
 		#--enable=golint \ <== comments on anything exported
 		#--enable=gotype \
+		#--enable=interfacer \
 		#--enable=unparam \
+		#--enable=vet \
+
+metalinter_all:
+	protoc $(INCLUDE) --lint_out=. types/*.proto
+	gometalinter.v2 --vendor --deadline=600s --enable-all --disable=lll ./...
+
+
+# To avoid unintended conflicts with file names, always add to .PHONY
+# unless there is a reason not to.
+# https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
+.PHONEY: check build install check_tools get_tools update_tools get_vendor_deps test fmt metalinter metalinter_all
