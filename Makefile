@@ -33,7 +33,7 @@ GO_TAGS=nopkcs11
 BUILD_DIR ?= .build
 GOOS ?= $(shell go env GOOS)
 
-PACKAGES = ./statemanager/... ./plugin/...
+PACKAGES = ./statemanager/... ./plugin/... ./fabproxy
 SRCFILES = ./plugin/evmscc.go ./statemanager/statemanager.go
 
 # We need this flag due to https://github.com/golang/go/issues/23739
