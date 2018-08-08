@@ -100,7 +100,7 @@ dependencies:
 	@scripts/check_docker_deps.sh
 
 .PHONY: integration-test
-integration-test: docker
+integration-test:
 	@echo "Running integration-test"
 	@cd e2e_cli && ./network_setup.sh down && ./network_setup.sh up mychannel 1
 
