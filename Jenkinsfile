@@ -7,9 +7,8 @@ node ('hyp-x') { // trigger build on x86_64 node
      env.PROJECT_DIR = "gopath/src/github.com/hyperledger"
      env.GOPATH = "$WORKSPACE/gopath"
      env.JAVA_HOME = "/usr/lib/jvm/java-1.8.0-openjdk-amd64"
-     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/v6.9.5/bin:/home/jenkins/.nvm/versions/node/v8.9.4/bin:$PATH"
      env.GOROOT = "/opt/go/go1.10.linux.amd64"
-     env.PATH = "$GOROOT/bin:$PATH"
+     env.PATH+EXTRA = "$GOROOT/bin:$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/v6.9.5/bin:/home/jenkins/.nvm/versions/node/v8.9.4/bin"
 
      def failure_stage = "none"
 // delete working directory
