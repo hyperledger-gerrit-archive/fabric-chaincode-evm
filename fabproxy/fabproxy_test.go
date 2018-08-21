@@ -46,9 +46,9 @@ var _ = Describe("Fabproxy", func() {
 			return nil
 		}
 
-		var err error
 		//curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b", "0x2"],"id":1}'
 
+		var err error
 		body := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_getCode","params":["0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b"],"id":1}`)
 		req, err = http.NewRequest("POST", proxyAddr, body)
 		Expect(err).ToNot(HaveOccurred())
@@ -75,5 +75,52 @@ var _ = Describe("Fabproxy", func() {
 		Expect(err).ToNot(HaveOccurred())
 
 		Expect(respBody).To(Equal(expectedBody))
+	})
+
+	Context("when the request has Cross-Origin Resource Sharing Headers", func() {
+		Context("when the request method is POST", func() {
+			BeforeEach(func() {
+				//curl -X OPTIONS http://localhost:5000 -H "Origin: http://example.com" -H "Access-Control-Request-Method: POST"
+
+				var err error
+				body := strings.NewReader("")
+				req, err = http.NewRequest("OPTIONS", proxyAddr, body)
+				Expect(err).ToNot(HaveOccurred())
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Origin", "[http://example.com]")
+				req.Header.Set("Access-Control-Request-Method", "POST")
+			})
+
+			It("successfully processes the request", func() {
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+
+				resp.StatusCode = http.StatusOK
+
+				Expect(resp.Header.Get("Access-Control-Allow-Origin")).To(Equal("*"))
+			})
+		})
+
+		Context("when the request method is not POST", func() {
+			BeforeEach(func() {
+				//curl -X OPTIONS http://localhost:5000 -H "Origin: http://example.com" -H "Access-Control-Request-Method: GET"
+				var err error
+				body := strings.NewReader("")
+				req, err = http.NewRequest("OPTIONS", proxyAddr, body)
+				Expect(err).ToNot(HaveOccurred())
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Origin", "[http://example.com]")
+				req.Header.Set("Access-Control-Request-Method", "GET")
+			})
+
+			It("successfully processes the request", func() {
+				client := &http.Client{}
+				resp, err := client.Do(req)
+				Expect(err).ToNot(HaveOccurred())
+
+				resp.StatusCode = http.StatusMethodNotAllowed
+			})
+		})
 	})
 })
