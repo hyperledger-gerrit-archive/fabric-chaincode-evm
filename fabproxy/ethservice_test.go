@@ -346,15 +346,12 @@ var _ = Describe("Ethservice", func() {
 
 	Describe("GetTransactionReceipt", func() {
 		var (
-			sampleResponse      channel.Response
 			sampleTransaction   *peer.ProcessedTransaction
 			sampleBlock         *common.Block
 			sampleTransactionID string
 		)
 
 		BeforeEach(func() {
-			sampleResponse = channel.Response{}
-
 			var err error
 			sampleTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample arg 2")}, []byte("sample-response"))
 			Expect(err).ToNot(HaveOccurred())
@@ -536,6 +533,68 @@ var _ = Describe("Ethservice", func() {
 				Expect(reply).To(BeEmpty())
 			})
 		})
+	})
+
+	Describe("GetBlockByNumber", func() {
+		Context("bad parameters", func() {
+			Context("an incorrect number of args", func() {
+				var reply fabproxy.Block
+				Specify("no args", func() {
+					var arg []interface{}
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+				Specify("one arg", func() {
+					arg := make([]interface{}, 1)
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+				Specify("more than two args", func() {
+					arg := make([]interface{}, 3)
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+			Context("wrong arg types", func() {
+				var reply fabproxy.Block
+				Specify("not a named block or numbered block as first arg", func() {
+					arg := make([]interface{}, 2)
+					arg[0] = "hurf%&"
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+				Specify("not a boolean as second arg", func() {
+					arg := make([]interface{}, 2)
+					arg[0] = "latest"
+					arg[1] = "durf"
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+		})
+
+		Context("good parameters", func() {
+			var reply fabproxy.Block
+			Context("partial block", func() {
+				It("requests a block by number", func() {
+					arg := make([]interface{}, 2)
+					arg[0] = "0x0"
+					arg[1] = "false"
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+			Context("full block", func() {
+				It("requests a block by number in hex", func() {
+					arg := make([]interface{}, 2)
+					arg[0] = "0x0"
+					arg[1] = "true"
+					err := ethservice.GetBlockByNumber(&http.Request{}, &arg, &reply)
+					Expect(err).To(HaveOccurred())
+				})
+			})
+		})
+
 	})
 })
 
