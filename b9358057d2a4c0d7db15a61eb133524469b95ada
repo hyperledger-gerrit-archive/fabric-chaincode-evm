@@ -1,0 +1,8 @@
+Verified+1: Hyperledger Jobbuilder <jobbuilder@jenkins.hyperledger.org>
+Code-Review+2: Jay Guo <guojiannan1101@gmail.com>
+Code-Review+2: Christopher Ferris <chris.ferris@gmail.com>
+Submitted-by: Christopher Ferris <chris.ferris@gmail.com>
+Submitted-at: Tue, 04 Sep 2018 17:29:04 +0000
+Reviewed-on: https://gerrit.hyperledger.org/r/24185
+Project: fabric-chaincode-evm
+Branch: refs/heads/master
