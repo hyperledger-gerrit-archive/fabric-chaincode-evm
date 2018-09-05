@@ -61,4 +61,4 @@ changelog:
 .PHONY: integration-test
 integration-test:
 	@echo "Running integration-test"
-	@cd e2e_cli && ./network_setup.sh down && ./network_setup.sh up mychannel 1
+	@scripts/run-integration-tests.sh
