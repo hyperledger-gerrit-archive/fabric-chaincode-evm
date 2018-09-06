@@ -15,10 +15,16 @@
 #   - linter - runs all code checks
 #   - unit-test - runs the go-test based unit tests
 #   - integration-test - runs the e2e_cli based test
+#		- ccenv - pulls the latest docker ccenv image
+#
+ARCH=$(shell go env GOARCH)
+BASEIMAGE_RELEASE=0.4.8
+BASE_DOCKER_NS ?= hyperledger
+
 
 PACKAGES = ./statemanager/... ./evmcc/... ./fabproxy/
 
-EXECUTABLES ?= go git curl
+EXECUTABLES ?= go git curl docker
 K := $(foreach exec,$(EXECUTABLES),\
 	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
 
@@ -58,7 +64,11 @@ check-deps:
 changelog:
 	@scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
 
+ccenv:
+	docker pull $(BASE_DOCKER_NS)/fabric-ccenv:latest
+	docker tag $(BASE_DOCKER_NS)/fabric-ccenv:latest $(BASE_DOCKER_NS)/fabric-ccenv
+
 .PHONY: integration-test
-integration-test:
+integration-test: ccenv 
 	@echo "Running integration-test"
-	@cd e2e_cli && ./network_setup.sh down && ./network_setup.sh up mychannel 1
+	@scripts/run-integration-tests.sh
