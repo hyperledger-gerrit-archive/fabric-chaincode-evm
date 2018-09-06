@@ -29,8 +29,12 @@ func NewFabProxy(service EthService) *FabProxy {
 	}
 
 	rpcServer.RegisterCodec(NewRPCCodec(), "application/json")
-	rpcServer.RegisterService(service, "eth")
-
+	if err := rpcServer.RegisterService(service, "eth"); err != nil {
+		fmt.Println(err)
+	}
+	if err := rpcServer.RegisterService(&NetService{}, "net"); err != nil {
+		fmt.Println(err)
+	}
 	return proxy
 }
 
@@ -43,7 +47,7 @@ func (p *FabProxy) Start(port int) {
 	allowedMethods := handlers.AllowedMethods([]string{"POST"})
 
 	p.httpServer = &http.Server{Handler: handlers.CORS(allowedHeaders, allowedOrigins, allowedMethods)(r), Addr: fmt.Sprintf(":%d", port)}
-	p.httpServer.ListenAndServe()
+	fmt.Println(p.httpServer.ListenAndServe())
 }
 
 func (p *FabProxy) Shutdown() error {
