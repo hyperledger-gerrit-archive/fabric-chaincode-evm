@@ -39,7 +39,9 @@ var _ = Describe("Fabproxy", func() {
 		client = &http.Client{}
 
 		proxyDoneChan = make(chan struct{}, 1)
+		var err error
 		proxy = fabproxy.NewFabProxy(mockEthService)
+		Expect(err).ToNot(HaveOccurred())
 
 		go func(proxy *fabproxy.FabProxy, proxyDoneChan chan struct{}) {
 			proxy.Start(port)
@@ -65,7 +67,6 @@ var _ = Describe("Fabproxy", func() {
 		}
 
 		//curl -X POST --data '{"jsonrpc":"2.0","method":"eth_getCode","params":["0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b", "0x2"],"id":1}'
-		var err error
 		body := strings.NewReader(`{"jsonrpc":"2.0","method":"eth_getCode","params":["0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b"],"id":1}`)
 		req, err = http.NewRequest("POST", proxyAddr, body)
 		Expect(err).ToNot(HaveOccurred())
