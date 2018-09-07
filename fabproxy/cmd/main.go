@@ -71,8 +71,16 @@ func main() {
 	ethService := fabproxy.NewEthService(client, ledger, ch, ccid)
 
 	fmt.Printf("Starting Fab Proxy on port %d\n", portNumber)
-	proxy := fabproxy.NewFabProxy(ethService)
-	proxy.Start(portNumber)
+	proxy, err := fabproxy.NewFabProxy(ethService)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	err = proxy.Start(portNumber)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
 	defer func() {
 		fmt.Println("Shutting down the Fab Proxy")
 		proxy.Shutdown()

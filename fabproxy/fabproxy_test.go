@@ -39,7 +39,7 @@ var _ = Describe("Fabproxy", func() {
 		client = &http.Client{}
 
 		proxyDoneChan = make(chan struct{}, 1)
-		proxy = fabproxy.NewFabProxy(mockEthService)
+		proxy, _ = fabproxy.NewFabProxy(mockEthService)
 
 		go func(proxy *fabproxy.FabProxy, proxyDoneChan chan struct{}) {
 			proxy.Start(port)
