@@ -74,6 +74,19 @@ type MockEthService struct {
 	accountsReturnsOnCall map[int]struct {
 		result1 error
 	}
+	GetBalanceStub        func(r *http.Request, p *[]interface{}, reply *string) error
+	getBalanceMutex       sync.RWMutex
+	getBalanceArgsForCall []struct {
+		r     *http.Request
+		p     *[]interface{}
+		reply *string
+	}
+	getBalanceReturns struct {
+		result1 error
+	}
+	getBalanceReturnsOnCall map[int]struct {
+		result1 error
+	}
 	invocations      map[string][][]interface{}
 	invocationsMutex sync.RWMutex
 }
@@ -328,6 +341,56 @@ func (fake *MockEthService) AccountsReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *MockEthService) GetBalance(r *http.Request, p *[]interface{}, reply *string) error {
+	fake.getBalanceMutex.Lock()
+	ret, specificReturn := fake.getBalanceReturnsOnCall[len(fake.getBalanceArgsForCall)]
+	fake.getBalanceArgsForCall = append(fake.getBalanceArgsForCall, struct {
+		r     *http.Request
+		p     *[]interface{}
+		reply *string
+	}{r, p, reply})
+	fake.recordInvocation("GetBalance", []interface{}{r, p, reply})
+	fake.getBalanceMutex.Unlock()
+	if fake.GetBalanceStub != nil {
+		return fake.GetBalanceStub(r, p, reply)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fake.getBalanceReturns.result1
+}
+
+func (fake *MockEthService) GetBalanceCallCount() int {
+	fake.getBalanceMutex.RLock()
+	defer fake.getBalanceMutex.RUnlock()
+	return len(fake.getBalanceArgsForCall)
+}
+
+func (fake *MockEthService) GetBalanceArgsForCall(i int) (*http.Request, *[]interface{}, *string) {
+	fake.getBalanceMutex.RLock()
+	defer fake.getBalanceMutex.RUnlock()
+	return fake.getBalanceArgsForCall[i].r, fake.getBalanceArgsForCall[i].p, fake.getBalanceArgsForCall[i].reply
+}
+
+func (fake *MockEthService) GetBalanceReturns(result1 error) {
+	fake.GetBalanceStub = nil
+	fake.getBalanceReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) GetBalanceReturnsOnCall(i int, result1 error) {
+	fake.GetBalanceStub = nil
+	if fake.getBalanceReturnsOnCall == nil {
+		fake.getBalanceReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.getBalanceReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *MockEthService) Invocations() map[string][][]interface{} {
 	fake.invocationsMutex.RLock()
 	defer fake.invocationsMutex.RUnlock()
@@ -341,6 +404,8 @@ func (fake *MockEthService) Invocations() map[string][][]interface{} {
 	defer fake.getTransactionReceiptMutex.RUnlock()
 	fake.accountsMutex.RLock()
 	defer fake.accountsMutex.RUnlock()
+	fake.getBalanceMutex.RLock()
+	defer fake.getBalanceMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value

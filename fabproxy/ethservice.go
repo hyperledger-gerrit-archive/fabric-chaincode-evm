@@ -41,6 +41,7 @@ type EthService interface {
 	SendTransaction(r *http.Request, args *EthArgs, reply *string) error
 	GetTransactionReceipt(r *http.Request, arg *string, reply *TxReceipt) error
 	Accounts(r *http.Request, arg *string, reply *[]string) error
+	GetBalance(r *http.Request, p *[]interface{}, reply *string) error
 }
 
 type ethService struct {
@@ -245,4 +246,14 @@ func getPayloads(txActions *peer.TransactionAction) (*peer.ChaincodeProposalPayl
 		return ccProposalPayload, nil, err
 	}
 	return ccProposalPayload, respPayload, nil
+}
+
+// GetBalance an address and a block, but this implementation does not
+// check or use either.
+//
+//
+func (s *ethService) GetBalance(r *http.Request, p *[]interface{}, reply *string) error {
+	fmt.Println("GetBalance called")
+	*reply = "0x0"
+	return nil
 }
