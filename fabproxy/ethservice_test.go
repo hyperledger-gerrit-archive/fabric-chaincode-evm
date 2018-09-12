@@ -537,6 +537,16 @@ var _ = Describe("Ethservice", func() {
 			})
 		})
 	})
+
+	Describe("GetBalance", func() {
+		It("always returns zero", func() {
+			arg := make([]interface{}, 2)
+			var reply string
+			err := ethservice.GetBalance(&http.Request{}, &arg, &reply)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(reply).To(Equal("0x0"))
+		})
+	})
 })
 
 func GetSampleBlock(blkNumber uint64, blkHash []byte) (*common.Block, error) {
