@@ -56,6 +56,7 @@ type EthService interface {
 	EstimateGas(r *http.Request, args *EthArgs, reply *string) error
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
+	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
 }
 
 type ethService struct {
@@ -458,6 +459,45 @@ func (s *ethService) GetBlockByNumber(r *http.Request, p *[]interface{}, reply *
 		if err != nil {
 			return fmt.Errorf("")
 		}
+	}
+	return nil
+}
+
+type Transaction struct { // object, or null when no transaction was found:
+	BlockHash   string `json:"blockHash"`   // DATA, 32 Bytes - hash of the block where this transaction was in. null when its pending.
+	BlockNumber string `json:"blockNumber"` // QUANTITY - block number where this transaction was in. null when its pending.
+	// from //: DATA, 20 Bytes - address of the sender.
+	// gas //: QUANTITY - gas provided by the sender.
+	// gasPrice //: QUANTITY - gas price provided by the sender in Wei.
+	Hash string `json:"hash"` //: DATA, 32 Bytes - hash of the transaction.
+	// input //: DATA - the data send along with the transaction.
+	// nonce //: QUANTITY - the number of transactions made by the sender prior to this one.
+	// to //: DATA, 20 Bytes - address of the receiver. null when its a contract creation transaction.
+	// transactionIndex //: QUANTITY - integer of the transactions index position in the block. null when its pending.
+	// value //: QUANTITY - value transferred in Wei.
+	// v //: QUANTITY - ECDSA recovery id
+	// r //: DATA, 32 Bytes - ECDSA signature r
+	// s //: DATA, 32 Bytes - ECDSA signature s
+}
+
+func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error {
+	if *txID == "" {
+		return fmt.Errorf("txID was empty")
+	}
+	strippedTxId := strip0x(*txID)
+	fmt.Println("GetTransactionByHash", strippedTxId)
+
+	block, err := s.ledgerClient.QueryBlockByTxID(fab.TransactionID(strippedTxId))
+	if err != nil {
+		return fmt.Errorf("Failed to query the ledger: %s", err.Error())
+	}
+
+	blkHeader := block.GetHeader()
+
+	*reply = Transaction{
+		Hash:        *txID,
+		BlockHash:   "0x" + hex.EncodeToString(blkHeader.GetDataHash()),
+		BlockNumber: "0x" + strconv.FormatUint(blkHeader.GetNumber(), 16),
 	}
 	return nil
 }
