@@ -9,6 +9,7 @@ package fabproxy_test
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -709,6 +710,35 @@ var _ = Describe("Ethservice", func() {
 					Expect(txns[1]).To(BeEquivalentTo("0x1234"))
 
 				})
+			})
+		})
+	})
+	Describe("GetTransactionByHash", func() {
+		var reply fabproxy.Transaction
+		Context("bad parameter", func() {
+			It("empty transaction ID", func() {
+				txID := ""
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Context("ledger lookup fails", func() {
+			It("empty transaction ID", func() {
+				txID := "0x1234"
+				block := &common.Block{}
+				mockLedgerClient.QueryBlockByTxIDReturns(block, fmt.Errorf("bad ledger lookup"))
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Context("succeeds", func() {
+			It("gets a transaction", func() {
+				txID := "0x1234"
+				block, _ := GetSampleBlock(1, []byte("12345abcd"))
+				mockLedgerClient.QueryBlockByTxIDReturns(block, nil)
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).ToNot(HaveOccurred())
+
 			})
 		})
 	})
