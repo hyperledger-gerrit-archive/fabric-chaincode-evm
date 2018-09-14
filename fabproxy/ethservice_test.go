@@ -720,6 +720,38 @@ var _ = Describe("Ethservice", func() {
 			})
 		})
 	})
+	Describe("GetTransactionByHash", func() {
+		var reply fabproxy.Transaction
+		Context("bad parameter", func() {
+			It("empty transaction ID", func() {
+				txID := ""
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Context("ledger lookup fails", func() {
+			It("empty transaction ID", func() {
+				txID := "0x1234"
+				block := &common.Block{}
+				mockLedgerClient.QueryBlockByTxIDReturns(block, fmt.Errorf("bad ledger lookup"))
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+		Context("succeeds", func() {
+			It("gets a transaction", func() {
+				txID := "0x1234"
+				dhash := []byte("abc\x00")
+				block, _ := GetSampleBlock(1, dhash)
+				mockLedgerClient.QueryBlockByTxIDReturns(block, nil)
+				err := ethservice.GetTransactionByHash(&http.Request{}, &txID, &reply)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(reply.Hash).To(Equal(txID), "txn id hash that was passed in")
+				Expect(reply.BlockHash).To(Equal("0x"+hex.EncodeToString(dhash)), "block data hash")
+				Expect(reply.BlockNumber).To(Equal("0x1"))
+			})
+		})
+	})
 })
 
 func GetSampleBlock(blkNumber uint64, blkHash []byte) (*common.Block, error) {
