@@ -56,6 +56,7 @@ type EthService interface {
 	EstimateGas(r *http.Request, args *EthArgs, reply *string) error
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
+	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
 }
 
 type ethService struct {
@@ -444,5 +445,113 @@ func (s *ethService) GetBlockByNumber(r *http.Request, p *[]interface{}, reply *
 			return err
 		}
 	}
+	return nil
+}
+
+// Transaction represents an ethereum evm transaction.
+// https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_gettransactionbyhash
+type Transaction struct { // object, or null when no transaction was found:
+	BlockHash   string `json:"blockHash"`   // DATA, 32 Bytes - hash of the block where this transaction was in. null when its pending.
+	BlockNumber string `json:"blockNumber"` // QUANTITY - block number where this transaction was in. null when its pending.
+	To          string `json:"to"`          // DATA, 20 Bytes - address of the receiver. null when its a contract creation transaction.
+	From        string `json:"from"`        // DATA, 20 Bytes - address of the sender.
+	Input       string `json:"input"`       // DATA - the data send along with the transaction.
+	// transactionIndex //: QUANTITY - integer of the transactions index position in the block. null when its pending.
+	Hash string `json:"hash"` //: DATA, 32 Bytes - hash of the transaction.
+	// gas //: QUANTITY - gas provided by the sender.
+	// gasPrice //: QUANTITY - gas price provided by the sender in Wei.
+
+	// nonce //: QUANTITY - the number of transactions made by the sender prior to this one.
+
+	// value //: QUANTITY - value transferred in Wei.
+	// v //: QUANTITY - ECDSA recovery id
+	// r //: DATA, 32 Bytes - ECDSA signature r
+	// s //: DATA, 32 Bytes - ECDSA signature s
+}
+
+// GetTransactionByHash takes a TransactionID as a string and returns
+// the details of the transaction.
+func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error {
+	if *txID == "" {
+		return fmt.Errorf("txID was empty")
+	}
+	strippedTxId := strip0x(*txID)
+	fmt.Println("GetTransactionByHash", strippedTxId)
+
+	txn := Transaction{
+		Hash: *txID,
+	}
+
+	block, err := s.ledgerClient.QueryBlockByTxID(fab.TransactionID(strippedTxId))
+	if err != nil {
+		return fmt.Errorf("Failed to query the ledger: %s", err.Error())
+	}
+	blkHeader := block.GetHeader()
+	txn.BlockHash = "0x" + hex.EncodeToString(blkHeader.GetDataHash())
+	txn.BlockNumber = "0x" + strconv.FormatUint(blkHeader.GetNumber(), 16)
+
+	// each data is a txn
+	data := block.GetData().GetData()
+
+	// drill into the block to find the specific transaction
+	for _, d := range data {
+		if d != nil { // can a data be empty? Is this an error?
+			env := &common.Envelope{}
+			if err := proto.Unmarshal(d, env); err != nil {
+				return err
+			}
+
+			payload := &common.Payload{}
+			if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
+				return err
+			}
+
+			txActions := &peer.Transaction{}
+			err = proto.Unmarshal(payload.GetData(), txActions)
+			if err != nil {
+				return fmt.Errorf("Failed to unmarshal transaction: %s", err.Error())
+			}
+
+			chdr := &common.ChannelHeader{}
+			if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+				return err
+			}
+
+			fmt.Println("data has transaction hash:", chdr.TxId)
+			// early exit to try next transaction
+			if strippedTxId != chdr.TxId {
+				// not a matching transaction, move to next
+				continue
+			}
+
+			ccPropPayload, _, err := getPayloads(txActions.GetActions()[0])
+			if err != nil {
+				return fmt.Errorf("Failed to unmarshal transaction: %s", err.Error())
+			}
+
+			invokeSpec := &peer.ChaincodeInvocationSpec{}
+			err = proto.Unmarshal(ccPropPayload.GetInput(), invokeSpec)
+			if err != nil {
+				return fmt.Errorf("Failed to unmarshal transaction: %s", err.Error())
+			}
+			args := invokeSpec.GetChaincodeSpec().GetInput().Args
+
+			// First arg is the callee address. If it is zero address, tx was a contract creation
+			contractAddress := ZeroAddress
+			callee, err := hex.DecodeString(string(args[0]))
+			if err != nil {
+				return err
+			}
+			if bytes.Equal(callee, ZeroAddress) {
+				contractAddress = args[0]
+			}
+			txn.To = "0x" + string(contractAddress)
+
+			// Second arg is input data
+			txn.Input = "0x" + string(args[1])
+		}
+	}
+
+	*reply = txn
 	return nil
 }
