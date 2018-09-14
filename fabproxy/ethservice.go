@@ -56,6 +56,7 @@ type EthService interface {
 	EstimateGas(r *http.Request, args *EthArgs, reply *string) error
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
+	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
 }
 
 type ethService struct {
@@ -80,8 +81,8 @@ type TxReceipt struct {
 	BlockHash         string
 	BlockNumber       string
 	ContractAddress   string
-	GasUsed           int
-	CumulativeGasUsed int
+	GasUsed           string
+	CumulativeGasUsed string
 }
 
 func NewEthService(channelClient ChannelClient, ledgerClient LedgerClient, channelID string, ccid string) EthService {
@@ -130,7 +131,7 @@ func (s *ethService) SendTransaction(r *http.Request, args *EthArgs, reply *stri
 		return errors.New(fmt.Sprintf("Failed to execute transaction: %s", err.Error()))
 	}
 
-	*reply = string(response.TransactionID)
+	*reply = "0x" + string(response.TransactionID)
 	return nil
 }
 
@@ -177,10 +178,10 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 
 	receipt := TxReceipt{
 		TransactionHash:   *txID,
-		BlockHash:         hex.EncodeToString(blkHeader.GetDataHash()),
-		BlockNumber:       strconv.FormatUint(blkHeader.GetNumber(), 10),
-		GasUsed:           0,
-		CumulativeGasUsed: 0,
+		BlockHash:         "0x" + hex.EncodeToString(blkHeader.GetDataHash()),
+		BlockNumber:       "0x" + strconv.FormatUint(blkHeader.GetNumber(), 16),
+		GasUsed:           "0x0",
+		CumulativeGasUsed: "0x0",
 	}
 
 	args = invokeSpec.GetChaincodeSpec().GetInput().Args
@@ -191,7 +192,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 	}
 
 	if bytes.Equal(callee, ZeroAddress) {
-		receipt.ContractAddress = string(respPayload.GetResponse().GetPayload())
+		receipt.ContractAddress = "0x" + string(respPayload.GetResponse().GetPayload())
 	}
 	*reply = receipt
 
@@ -469,6 +470,60 @@ func (s *ethService) GetBlockByNumber(r *http.Request, p *[]interface{}, reply *
 		if err != nil {
 			return fmt.Errorf("")
 		}
+	}
+	return nil
+}
+
+type Transaction struct { // object, or null when no transaction was found:
+	BlockHash   string //: DATA, 32 Bytes - hash of the block where this transaction was in. null when its pending.
+	BlockNumber string //: QUANTITY - block number where this transaction was in. null when its pending.
+	//from//: DATA, 20 Bytes - address of the sender.
+	//gas//: QUANTITY - gas provided by the sender.
+	//gasPrice//: QUANTITY - gas price provided by the sender in Wei.
+	Hash string //: DATA, 32 Bytes - hash of the transaction.
+	//input//: DATA - the data send along with the transaction.
+	//nonce//: QUANTITY - the number of transactions made by the sender prior to this one.
+	//to//: DATA, 20 Bytes - address of the receiver. null when its a contract creation transaction.
+	//transactionIndex//: QUANTITY - integer of the transactions index position in the block. null when its pending.
+	//value//: QUANTITY - value transferred in Wei.
+	//    v//: QUANTITY - ECDSA recovery id
+	//  r//: DATA, 32 Bytes - ECDSA signature r
+	//s//: DATA, 32 Bytes - ECDSA signature s
+}
+
+func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error {
+	fmt.Println("GetTransactionByHash", *txID)
+	strippedTxId := strip0x(*txID)
+	fmt.Println("GetTransactionByHash", strippedTxId)
+	if txID == nil {
+		fmt.Println("txID was nil")
+	}
+	if *txID == "" {
+		fmt.Println("txID was empty string")
+	}
+
+	//args := [][]byte{[]byte(s.channelID), []byte(strippedTxId)}
+
+	/*
+		tx, err := s.ledgerClient.QueryTransaction(fab.TransactionID(strippedTxId))
+		if err != nil {
+			return errors.New(fmt.Sprintf("Failed to query the ledger: %s", err.Error()))
+		}
+	*/
+
+	//p := tx.GetTransactionEnvelope().GetPayload()
+
+	block, err := s.ledgerClient.QueryBlockByTxID(fab.TransactionID(strippedTxId))
+	if err != nil {
+		return fmt.Errorf("Failed to query the ledger: %s", err.Error())
+	}
+
+	blkHeader := block.GetHeader()
+
+	*reply = Transaction{
+		Hash:        *txID,
+		BlockHash:   hex.EncodeToString(blkHeader.GetDataHash()),
+		BlockNumber: strconv.FormatUint(blkHeader.GetNumber(), 16),
 	}
 	return nil
 }
