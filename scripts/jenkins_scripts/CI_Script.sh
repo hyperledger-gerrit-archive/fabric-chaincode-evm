@@ -7,6 +7,8 @@
 
 # exit on first error
 
+export NODE_VER=8.11.3 # Default nodejs version
+
 Parse_Arguments() {
       while [ $# -gt 0 ]; do
               case $1 in
@@ -15,6 +17,9 @@ Parse_Arguments() {
                             ;;
                       --clean_Environment)
                             clean_Environment
+                            ;;
+                      --install_Node)
+                            install_Node
                             ;;
               esac
               shift
@@ -64,6 +69,26 @@ rm -rf gopath/src/github.com/hyperledger/fabric-ca/vendor/github.com/cloudflare/
 
 clearContainers
 removeUnwantedImages
+}
+
+install_Node() {
+
+        # Install nvm to install multi node versions
+        wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash
+        # shellcheck source=/dev/null
+        export NVM_DIR="$HOME/.nvm"
+        # shellcheck source=/dev/null
+        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
+
+        echo "------> Install NodeJS"
+        # This also depends on the fabric-baseimage. Make sure you modify there as well.
+        echo "------> Use $NODE_VER for >=release-1.1 branches"
+        nvm install $NODE_VER || true
+        # use nodejs version
+        nvm use --delete-prefix v$NODE_VER --silent
+
+        echo "npm version ------> $(npm -v)"
+        echo "node version ------> $(node -v)"
 }
 
 env_Info() {
