@@ -25,7 +25,7 @@ BASE_DOCKER_TAG=$(ARCH)-$(BASEIMAGE_RELEASE)
 
 PACKAGES = ./statemanager/... ./evmcc/... ./fabproxy/
 
-EXECUTABLES ?= go git curl docker
+EXECUTABLES ?= go git curl docker node
 K := $(foreach exec,$(EXECUTABLES),\
 	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
 
