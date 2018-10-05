@@ -7,7 +7,7 @@ node ('hyp-x') { // trigger build on x86_64 node
      env.PROJECT_DIR = "gopath/src/github.com/hyperledger"
      env.GOPATH = "$WORKSPACE/gopath"
      env.JAVA_HOME = "/usr/lib/jvm/java-1.8.0-openjdk-amd64"
-     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/v6.9.5/bin:/home/jenkins/.nvm/versions/node/v8.9.4/bin:$PATH"
+     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/v6.9.5/bin:/home/jenkins/.nvm/versions/node/v8.11.3/bin:$PATH"
      env.GOROOT = "/opt/go/go1.10.linux.amd64"
      env.PATH = "$GOROOT/bin:$PATH"
 
@@ -78,8 +78,11 @@ node ('hyp-x') { // trigger build on x86_64 node
 // Run integration tests (e2e tests)
       stage("Integration-Tests") {
           try {
-                 dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm") {
+                 dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm/scripts/jenkins_scripts") {
                  sh '''
+                    echo "-------> Install NodeJs"
+                    './CI_Script.sh --install_Node'
+                    cd ../..
                     echo "-------> Run integration-tests"
                     make integration-test
                  '''
