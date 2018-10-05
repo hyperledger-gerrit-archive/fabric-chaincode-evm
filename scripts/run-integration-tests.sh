@@ -17,7 +17,7 @@ FABRIC_DIR=${GOPATH}/src/github.com/hyperledger/fabric
 integration_dirs() {
     local packages="$1"
 
-    go list -f {{.Dir}} "$packages" | grep -E '/integration($|/)' | sed "s,${fabric_chaincode_evm_dir},.,g"
+    go list -f {{.Dir}} "$packages" | grep -E '/integration($|/)'i -v 'helpers' | sed "s,${fabric_chaincode_evm_dir},.,g"
 }
 
 main() {
@@ -40,7 +40,7 @@ main() {
     popd
 
     echo "Running integration tests..."
-    go test "${dirs[@]}"
+    ginkgo -race -keepGoing "${dirs[@]}"
 }
 
 main "$@"

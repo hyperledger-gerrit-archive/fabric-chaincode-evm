@@ -74,7 +74,7 @@ docker-images:
 	docker tag $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-kafka
 
 .PHONY: integration-test
-integration-test: docker-images
+integration-test: docker-images gotool.ginkgo
 	@echo "Running integration-test"
 	@scripts/run-integration-tests.sh
 
