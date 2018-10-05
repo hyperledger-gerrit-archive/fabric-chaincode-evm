@@ -86,6 +86,7 @@ install_Node() {
         nvm use --delete-prefix v$NODE_VER --silent
 
         echo "npm version ------> $(npm -v)"
+        echo "which npm --------> $(which npm)"
         echo "node version ------> $(node -v)"
 }
 
