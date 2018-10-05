@@ -80,6 +80,8 @@ node ('hyp-x') { // trigger build on x86_64 node
           try {
                  dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm") {
                  sh '''
+                    echo "-------> Install NodeJs"
+                    './CI_Script.sh --install_Node'
                     echo "-------> Run integration-tests"
                     make integration-test
                  '''
