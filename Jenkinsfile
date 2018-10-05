@@ -84,6 +84,7 @@ node ('hyp-x') { // trigger build on x86_64 node
                  sh '''
                     echo "-------> Install NodeJs"
                     ./CI_Script.sh --install_Node
+                    npm install -g web3@0.20.2
                     cd ../..
                     echo "-------> Run integration-tests"
                     make integration-test
