@@ -35,15 +35,15 @@ gotool.golint:
 gotool.protoc-gen-go:
 	@echo "Building github.com/golang/protobuf/protoc-gen-go -> protoc-gen-go"
 	@mkdir -p $(GOTOOLS_GOPATH)/src/github.com/golang/protobuf/
-	@cp -R $(GOPATH)/src/github.com/hyperledger/fabric/vendor/github.com/golang/protobuf/* $(GOTOOLS_GOPATH)/src/github.com/golang/protobuf
+	@cp -R $(GOPATH)/src/github.com/hyperledger/fabric-chaincode-evm/vendor/github.com/golang/protobuf/* $(GOTOOLS_GOPATH)/src/github.com/golang/protobuf
 	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go install github.com/golang/protobuf/protoc-gen-go
 
 # Special override for ginkgo since we want to use the version vendored with the project
 gotool.ginkgo:
 	@echo "Building github.com/onsi/ginkgo/ginkgo -> ginkgo"
-	@mkdir -p $(GOTOOLS_GOPATH)/src/github.com/onsi/ginkgo/ginkgo/
-	@cp -R $(GOPATH)/src/github.com/hyperledger/fabric/vendor/github.com/onsi/ginkgo/* $(GOTOOLS_GOPATH)/src/github.com/onsi/ginkgo
-	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go install github.com/onsi/ginkgo/ginkgo
+	@mkdir -p $(GOPATH)/src/github.com/onsi/ginkgo/ginkgo/
+	@cp -R $(GOPATH)/src/github.com/hyperledger/fabric-chaincode-evm/vendor/github.com/onsi/ginkgo/* $(GOPATH)/src/github.com/onsi/ginkgo
+	@GOPATH=$(abspath $(GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go install github.com/onsi/ginkgo/ginkgo
 
 # Lock to a versioned dep
 gotool.dep: DEP_VERSION ?= "v0.4.1"
@@ -63,4 +63,3 @@ gotool.%:
 $(GOTOOLS_BINDIR)/%:
 	$(eval TOOL = ${subst $(GOTOOLS_BINDIR)/,,${@}})
 	@$(MAKE) -f gotools.mk gotool.$(TOOL)
-
