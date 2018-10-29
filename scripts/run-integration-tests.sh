@@ -28,6 +28,24 @@ main() {
         dirs=($(integration_dirs "./..."))
     fi
 
+
+    echo "Installing Node"
+    ./scripts/jenkins_scripts/CI_Script.sh --install_Node
+
+    echo "Checking for node"
+    echo $(ls /home/jenkins/.nvm/versions/node/8.11.3/bin)
+    which node
+    if [ $? -ne 0  ]; then
+        echo "No node in PATH. Check dependencies"
+        exit 1
+    fi
+
+    if [ ! npm ls -g web3 | grep "web3@0.20.2" ]; then
+        npm install -g web3@0.20.2
+        echo "Getting location of node modules"
+        echo $(npm ls -g web3)
+    fi
+
     #Check if Fabric is in the gopath. Fabric needs to be in the gopath for the integration tests
     if [ ! -d "${FABRIC_DIR}" ]; then
         echo "Downloading Fabric"
