@@ -28,6 +28,16 @@ main() {
         dirs=($(integration_dirs "./..."))
     fi
 
+    which node
+    if [ $? -ne 0  ]; then
+        echo "No node in PATH. Check dependencies"
+        exit 1
+    fi
+
+    if [ ! npm ls -g web3 | grep "web3@0.20.2" ]; then
+        npm install -g web3@0.20.2
+    fi
+
     #Check if Fabric is in the gopath. Fabric needs to be in the gopath for the integration tests
     if [ ! -d "${FABRIC_DIR}" ]; then
         echo "Downloading Fabric"
