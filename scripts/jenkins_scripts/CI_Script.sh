@@ -87,6 +87,11 @@ install_Node() {
 
         echo "npm version ------> $(npm -v)"
         echo "node version ------> $(node -v)"
+        if [ ! "$(npm ls -g web3 | grep "web3@0.20.2")" ]; then
+             echo "-----> Install web3@0.20.2"
+             npm install -g web3@0.20.2
+        fi
+        npm config set prefix ~/npm
 }
 
 env_Info() {
