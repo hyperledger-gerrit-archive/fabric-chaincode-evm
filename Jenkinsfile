@@ -12,6 +12,7 @@ node ('hyp-x') { // trigger build on x86_64 node
      env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/${NODE_VER}/bin:$PATH"
      env.GOROOT = "/opt/go/go${GO_VER}.linux.amd64"
      env.PATH = "$GOROOT/bin:$PATH"
+     env.NODE_PATH = "/home/jenkins/npm/lib/node_modules"
 
      def failure_stage = "none"
 // delete working directory
@@ -82,7 +83,6 @@ node ('hyp-x') { // trigger build on x86_64 node
           try {
                  dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm/scripts/jenkins_scripts") {
                  sh '''
-                    echo "-------> Install NodeJs"
                     ./CI_Script.sh --install_Node
                     cd ../..
                     echo "-------> Run integration-tests"
