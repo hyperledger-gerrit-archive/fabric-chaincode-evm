@@ -8,7 +8,7 @@
 # script, they are treated as the directories containing the tests to run.
 # When no arguments are provided, all integration tests are executed.
 
-set -e -u
+set -e
 
 fabric_chaincode_evm_dir="$(cd "$(dirname "$0")/.." && pwd)"
 FABRIC_DIR=${GOPATH}/src/github.com/hyperledger/fabric
@@ -26,6 +26,20 @@ main() {
     local -a dirs=("$@")
     if [ "${#dirs[@]}" -eq 0 ]; then
         dirs=($(integration_dirs "./..."))
+    fi
+
+
+    echo "Installing Node"
+    ./scripts/jenkins_scripts/CI_Script.sh --install_Node
+
+    echo "Export node path"
+    export PATH=$PATH:/home/jenkins/.nvm/versions/node/v8.11.3/bin
+
+    if [ ! "$(npm ls -g web3 | grep "web3@0.20.2")" ]; then
+        echo "-----> Install web3@0.20.2"
+        npm install -g web3@0.20.2
+        echo "----> getting web3 location"
+        echo $(npm ls -g web3)
     fi
 
     #Check if Fabric is in the gopath. Fabric needs to be in the gopath for the integration tests
