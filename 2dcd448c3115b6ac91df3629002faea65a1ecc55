@@ -1,0 +1,9 @@
+Code-Review+1: Morgan Bauer <mbauer@us.ibm.com>
+Code-Review+2: Swetha Repakula <srepaku@us.ibm.com>
+Code-Review+2: Gari Singh <gari.r.singh@gmail.com>
+Verified+1: Gari Singh <gari.r.singh@gmail.com>
+Submitted-by: Gari Singh <gari.r.singh@gmail.com>
+Submitted-at: Mon, 29 Oct 2018 22:02:10 +0000
+Reviewed-on: https://gerrit.hyperledger.org/r/27206
+Project: fabric-chaincode-evm
+Branch: refs/heads/master
