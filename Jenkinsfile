@@ -80,11 +80,8 @@ node ('hyp-x') { // trigger build on x86_64 node
 // Run integration tests (e2e tests)
       stage("Integration-Tests") {
           try {
-                 dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm/scripts/jenkins_scripts") {
+                 dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm") {
                  sh '''
-                    echo "-------> Install NodeJs"
-                    ./CI_Script.sh --install_Node
-                    cd ../..
                     echo "-------> Run integration-tests"
                     make integration-test
                  '''
