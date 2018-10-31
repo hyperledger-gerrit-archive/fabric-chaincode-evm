@@ -87,6 +87,8 @@ install_Node() {
 
         echo "npm version ------> $(npm -v)"
         echo "node version ------> $(node -v)"
+        echo "where is node: $(which node)"
+        npm config set prefix ~/npm
 }
 
 env_Info() {
