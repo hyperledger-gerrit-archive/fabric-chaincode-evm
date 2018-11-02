@@ -9,18 +9,22 @@ package fabproxy
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
+	evm_event "github.com/hyperledger/fabric-chaincode-evm/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/peer"
+	"golang.org/x/crypto/sha3"
 )
 
 var ZeroAddress = make([]byte, 20)
@@ -67,7 +71,28 @@ type TxReceipt struct {
 	ContractAddress   string
 	GasUsed           int
 	CumulativeGasUsed int
+
+	Logs             []Log
+	TransactionIndex string
+	From             string
+	To               string
+	LogsBloom        Bloom
+	Status           string
 }
+
+type Log struct {
+	Address     string
+	Topics      []string
+	Data        string
+	BlockNumber string
+	TxHash      string
+	TxIndex     string //need to figure this out
+	BlockHash   string
+	Index       string
+	Type        string
+}
+
+type Bloom [256]byte
 
 func NewEthService(channelClient ChannelClient, ledgerClient LedgerClient, channelID string, ccid string) EthService {
 	return &ethService{channelClient: channelClient, ledgerClient: ledgerClient, channelID: channelID, ccid: ccid}
@@ -114,7 +139,8 @@ func (s *ethService) SendTransaction(r *http.Request, args *EthArgs, reply *stri
 	if err != nil {
 		return errors.New(fmt.Sprintf("Failed to execute transaction: %s", err.Error()))
 	}
-
+	//fmt.Printf("%s\n", response.Responses[0].ProposalResponse.Payload)
+	//fmt.Printf("%s\n", response.Responses)
 	*reply = string(response.TransactionID)
 	return nil
 }
@@ -166,6 +192,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		BlockNumber:       strconv.FormatUint(blkHeader.GetNumber(), 10),
 		GasUsed:           0,
 		CumulativeGasUsed: 0,
+		Status:            string(uint64(1)), //replace 1 with t.ChaincodeStatus
 	}
 
 	args = invokeSpec.GetChaincodeSpec().GetInput().Args
@@ -178,6 +205,51 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 	if bytes.Equal(callee, ZeroAddress) {
 		receipt.ContractAddress = string(respPayload.GetResponse().GetPayload())
 	}
+
+	fmt.Println("respPayload:")
+	fmt.Println(respPayload)
+	fmt.Println()
+
+	if respPayload.Events != nil {
+		var eventMsgs evm_event.MessagePayloads
+		chaincodeEvent, err := getChaincodeEvents(respPayload)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Failed to decode chaincode event: %s", err.Error()))
+		}
+
+		ccEventPayload := chaincodeEvent.Payload
+		e := json.Unmarshal(ccEventPayload, &eventMsgs)
+		if e != nil {
+			return errors.New(fmt.Sprintf("Failed to unmarshal chaincode event payload: %s", e.Error()))
+		}
+
+		var txLogs []Log
+		txLogs = make([]Log, 0)
+		for i, evDataLog := range eventMsgs.Payloads {
+			var topics []string
+			topics = make([]string, 0)
+			for _, topic := range evDataLog.Message.Topics {
+				topics = append(topics, topic.String())
+			}
+			logObj := Log{
+				Address:     evDataLog.Message.Address.String(),
+				Topics:      topics,
+				Data:        string(evDataLog.Message.Data),
+				BlockNumber: receipt.BlockNumber,
+				TxHash:      *txID,
+				//TxIndex:     string(transactionIndex),
+				BlockHash: hex.EncodeToString(blkHeader.GetDataHash()),
+				Index:     string(i),
+				Type:      "mined",
+			}
+			txLogs = append(txLogs, logObj)
+		}
+		receipt.Logs = txLogs
+	} else {
+		receipt.Logs = nil
+	}
+
+	receipt.LogsBloom = CreateBloom(receipt.Logs)
 	*reply = receipt
 
 	return nil
@@ -245,4 +317,62 @@ func getPayloads(txActions *peer.TransactionAction) (*peer.ChaincodeProposalPayl
 		return ccProposalPayload, nil, err
 	}
 	return ccProposalPayload, respPayload, nil
+}
+
+func getChaincodeEvents(respPayload *peer.ChaincodeAction) (*peer.ChaincodeEvent, error) {
+	eBytes := respPayload.Events
+	chaincodeEvent := &peer.ChaincodeEvent{}
+	err := proto.Unmarshal(eBytes, chaincodeEvent)
+	return chaincodeEvent, err
+}
+
+func CreateBloom(logs []Log) Bloom {
+	bin := new(big.Int)
+	bin.Or(bin, LogsBloom(logs))
+	return BytesToBloom(bin.Bytes())
+}
+
+func LogsBloom(logs []Log) *big.Int {
+	bin := new(big.Int)
+	for _, log := range logs {
+		bin.Or(bin, bloom9([]byte(log.Address)))
+		for _, t := range log.Topics {
+			b := []byte(t)
+			bin.Or(bin, bloom9(b[:]))
+		}
+	}
+
+	return bin
+}
+
+func bloom9(b []byte) *big.Int {
+	b = Keccak256(b[:])
+
+	r := new(big.Int)
+
+	for i := 0; i < 6; i += 2 {
+		t := big.NewInt(1)
+		b := (uint(b[i+1]) + (uint(b[i]) << 8)) & 2047
+		r.Or(r, t.Lsh(t, b))
+	}
+
+	return r
+}
+
+func BytesToBloom(b []byte) Bloom {
+	var bloom Bloom
+	//bloom.SetBytes(b)
+	if len(b) > len(bloom) {
+		panic(fmt.Sprintf("bloom bytes too big %d %d", len(bloom), len(b)))
+	}
+	copy(bloom[256-len(b):], b)
+	return bloom
+}
+
+func Keccak256(data ...[]byte) []byte {
+	d := sha3.New256()
+	for _, b := range data {
+		d.Write(b)
+	}
+	return d.Sum(nil)
 }
