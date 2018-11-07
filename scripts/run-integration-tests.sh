@@ -8,7 +8,7 @@
 # script, they are treated as the directories containing the tests to run.
 # When no arguments are provided, all integration tests are executed.
 
-set -e -u
+set -e
 
 fabric_chaincode_evm_dir="$(cd "$(dirname "$0")/.." && pwd)"
 FABRIC_DIR=${GOPATH}/src/github.com/hyperledger/fabric
@@ -28,6 +28,15 @@ main() {
         dirs=($(integration_dirs "./..."))
     fi
 
+    if [ ! which node> /dev/null 2>&1 ]; then
+        echo "No node in PATH. Check dependencies"
+        exit 1
+    fi
+
+    if [ ! npm ls -g web3 | grep "web3@0.20.2"]; then
+        npm install -g web3@0.20.2
+    fi
+
     #Check if Fabric is in the gopath. Fabric needs to be in the gopath for the integration tests
     if [ ! -d "${FABRIC_DIR}" ]; then
         echo "Downloading Fabric"
@@ -38,7 +47,7 @@ main() {
     pushd ${FABRIC_DIR}
         make ccenv
     popd
-
+    echo "------_GOPATH" $PATH
     echo "Running integration tests..."
     ginkgo -noColor -randomizeAllSpecs -race -keepGoing --slowSpecThreshold 80 -r "${dirs[@]}"
 }
