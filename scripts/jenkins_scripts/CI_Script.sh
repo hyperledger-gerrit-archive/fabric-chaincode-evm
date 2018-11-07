@@ -71,22 +71,12 @@ removeUnwantedImages
 
 install_Node() {
 
-        # Install nvm to install multi node versions
-        wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh | bash
-        # shellcheck source=/dev/null
-        export NVM_DIR="$HOME/.nvm"
-        # shellcheck source=/dev/null
-        [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"  # This loads nvm
-
-        echo "------> Install NodeJS"
-        # This also depends on the fabric-baseimage. Make sure you modify there as well.
-        echo "------> Use $NODE_VER for >=release-1.1 branches"
-        nvm install $NODE_VER || true
-        # use nodejs version
-        nvm use --delete-prefix v$NODE_VER --silent
-
         echo "npm version ------> $(npm -v)"
         echo "node version ------> $(node -v)"
+        if [ ! "$(npm ls -g web3 | grep "web3@0.20.2")" ]; then
+             echo "-----> Install web3@0.20.2"
+             npm install -g web3@0.20.2
+        fi
 }
 
 env_Info() {

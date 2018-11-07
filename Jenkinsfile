@@ -5,12 +5,12 @@
 node ('hyp-x') { // trigger build on x86_64 node
      def ROOTDIR = pwd() // workspace dir (/w/workspace/<job_name>
      env.PROJECT_DIR = "gopath/src/github.com/hyperledger"
-     env.NODE_VER = "8.11.3"
      env.GO_VER = "1.10.4"
      env.GOPATH = "$WORKSPACE/gopath"
-     env.JAVA_HOME = "/usr/lib/jvm/java-1.8.0-openjdk-amd64"
-     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/${NODE_VER}/bin:$PATH"
+     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:$PATH"
      env.GOROOT = "/opt/go/go${GO_VER}.linux.amd64"
+     def nodeHome = tool 'nodejs-8.11.3'
+     env.PATH = "${env.PATH}:${nodeHome}/bin"
      env.PATH = "$GOROOT/bin:$PATH"
 
      def failure_stage = "none"
@@ -82,7 +82,6 @@ node ('hyp-x') { // trigger build on x86_64 node
           try {
                  dir("${ROOTDIR}/$PROJECT_DIR/fabric-chaincode-evm/scripts/jenkins_scripts") {
                  sh '''
-                    echo "-------> Install NodeJs"
                     ./CI_Script.sh --install_Node
                     cd ../..
                     echo "-------> Run integration-tests"

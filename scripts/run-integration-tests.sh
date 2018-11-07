@@ -8,7 +8,7 @@
 # script, they are treated as the directories containing the tests to run.
 # When no arguments are provided, all integration tests are executed.
 
-set -e -u
+set -e
 
 fabric_chaincode_evm_dir="$(cd "$(dirname "$0")/.." && pwd)"
 FABRIC_DIR=${GOPATH}/src/github.com/hyperledger/fabric
@@ -38,7 +38,7 @@ main() {
     pushd ${FABRIC_DIR}
         make ccenv
     popd
-
+    echo "------_GOPATH" $PATH
     echo "Running integration tests..."
     ginkgo -noColor -randomizeAllSpecs -race -keepGoing --slowSpecThreshold 80 -r "${dirs[@]}"
 }
