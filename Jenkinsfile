@@ -2,16 +2,17 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 //
+timeout(40) {
 node ('hyp-x') { // trigger build on x86_64 node
-     def ROOTDIR = pwd() // workspace dir (/w/workspace/<job_name>
+   timestamps {
+    try {
+     def ROOTDIR = pwd() // workspace dir (/w/workspace/<job_name>)
      env.PROJECT_DIR = "gopath/src/github.com/hyperledger"
      env.NODE_VER = "8.11.3"
      env.GO_VER = "1.10.4"
      env.GOPATH = "$WORKSPACE/gopath"
-     env.JAVA_HOME = "/usr/lib/jvm/java-1.8.0-openjdk-amd64"
-     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/${NODE_VER}/bin:$PATH"
      env.GOROOT = "/opt/go/go${GO_VER}.linux.amd64"
-     env.PATH = "$GOROOT/bin:$PATH"
+     env.PATH = "$GOPATH/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:~/npm/bin:/home/jenkins/.nvm/versions/node/${NODE_VER}/bin:$GOROOT/bin:$PATH"
 
      def failure_stage = "none"
 // delete working directory
@@ -24,11 +25,13 @@ node ('hyp-x') { // trigger build on x86_64 node
                  cd $PROJECT_DIR
                  git clone git://cloud.hyperledger.org/mirror/fabric-chaincode-evm && cd fabric-chaincode-evm
                  git checkout "$GERRIT_BRANCH" && git fetch origin "$GERRIT_REFSPEC" && git checkout FETCH_HEAD
+                 git lo -n2 --pretty=oneline --abbrev-commit
               '''
               }
           }
           catch (err) {
                  failure_stage = "Fetch patchset"
+                 currentBuild.result = 'FAILURE'
                  throw err
           }
       }
@@ -41,6 +44,7 @@ node ('hyp-x') { // trigger build on x86_64 node
           }
           catch (err) {
                  failure_stage = "Clean Environment - Get Env Info"
+                 currentBuild.result = 'FAILURE'
                  throw err
           }
       }
@@ -58,6 +62,7 @@ node ('hyp-x') { // trigger build on x86_64 node
           }
           catch (err) {
                  failure_stage = "license"
+                 currentBuild.result = 'FAILURE'
                  throw err
           }
       }
@@ -74,6 +79,7 @@ node ('hyp-x') { // trigger build on x86_64 node
           }
           catch (err) {
                  failure_stage = "unit-tests"
+                 currentBuild.result = 'FAILURE'
                  throw err
           }
       }
@@ -92,7 +98,17 @@ node ('hyp-x') { // trigger build on x86_64 node
           }
           catch (err) {
                  failure_stage = "integration-test"
+                 currentBuild.result = 'FAILURE'
                  throw err
           }
-      }
-} // node block end here
+        }
+           } finally {
+              if (env.JOB_NAME == "fabric-chaincode-evm-merge-master-x86_64") {
+                if (currentBuild.result == 'FAILURE') { // Other values: SUCCESS, UNSTABLE
+                  rocketSend channel: 'fabric-evm', emoji: ':sob:', message: "Build Notification - STATUS: ${currentBuild.result} - BRANCH: ${env.GERRIT_BRANCH} - PROJECT: ${env.PROJECT} - BUILD_URL - (<${env.BUILD_URL}|Open>)"
+                }
+              }
+            } // finally
+    } // timestamps
+} // node
+} // timeout
