@@ -1,4 +1,4 @@
-#SPDX-License-Identifier: Apache-2.0
+#gSPDX-License-Identifier: Apache-2.0
 
 # Local build binaries
 node-cli/node-cli
@@ -46,3 +46,6 @@ examples/e2e_cli/crypto-config/*
 .tox/
 # vscode settings
 .vscode
+# Node artifacts from installing web3 for integration tests
+node_modules
+package-lock.json
