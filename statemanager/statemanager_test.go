@@ -12,6 +12,7 @@ import (
 
 	"github.com/hyperledger/burrow/account"
 	"github.com/hyperledger/burrow/binary"
+	"github.com/hyperledger/burrow/permission"
 	"github.com/hyperledger/fabric-chaincode-evm/mocks"
 	"github.com/hyperledger/fabric-chaincode-evm/statemanager"
 
@@ -63,7 +64,8 @@ var _ = Describe("Statemanager", func() {
 			expectedAcct := account.ConcreteAccount{
 				Address: addr,
 				Code:    []byte("account code"),
-			}.Account()
+			}.MutableAccount()
+			expectedAcct.SetPermissions(permission.AllAccountPermissions)
 
 			acct, err := sm.GetAccount(addr)
 			Expect(err).ToNot(HaveOccurred())
