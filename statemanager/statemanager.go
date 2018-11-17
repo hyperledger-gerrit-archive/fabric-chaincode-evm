@@ -11,6 +11,7 @@ import (
 
 	"github.com/hyperledger/burrow/account"
 	"github.com/hyperledger/burrow/binary"
+	"github.com/hyperledger/burrow/permission"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 )
 
@@ -46,10 +47,14 @@ func (s *stateManager) GetAccount(address account.Address) (account.Account, err
 		return account.ConcreteAccount{}.Account(), nil
 	}
 
-	return account.ConcreteAccount{
+	acct := account.ConcreteAccount{
 		Address: address,
 		Code:    code,
-	}.Account(), nil
+	}.MutableAccount()
+
+	//We are allowing all permissions, so contract creation and contract invocation will be allowed.
+	acct.SetPermissions(permission.AllAccountPermissions)
+	return acct, nil
 }
 
 func (s *stateManager) GetStorage(address account.Address, key binary.Word256) (binary.Word256, error) {
