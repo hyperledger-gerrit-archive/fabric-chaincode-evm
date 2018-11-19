@@ -47,6 +47,10 @@
   version = "1.1.0"
   name = "github.com/golang/protobuf"
 
+[[constraint]]
+  name = "go.uber.org/zap"
+  version = "1.9.0"
+
 #Constraints from fabric-sdk-go
 [[override]]
   revision = "aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5"
