@@ -1,0 +1,8 @@
+Verified+1: Hyperledger Jobbuilder <jobbuilder@jenkins.hyperledger.org>
+Code-Review+2: Christopher Ferris <chris.ferris@gmail.com>
+Code-Review+2: Swetha Repakula <srepaku@us.ibm.com>
+Submitted-by: Swetha Repakula <srepaku@us.ibm.com>
+Submitted-at: Mon, 26 Nov 2018 21:22:57 +0000
+Reviewed-on: https://gerrit.hyperledger.org/r/27497
+Project: fabric-chaincode-evm
+Branch: refs/heads/master
