@@ -8,6 +8,7 @@ package fabproxy_test
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,6 +18,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger/burrow/account"
+	"github.com/hyperledger/burrow/binary"
+	"github.com/hyperledger/burrow/execution/evm/events"
 	"github.com/hyperledger/fabric-chaincode-evm/fabproxy"
 	fabproxy_mocks "github.com/hyperledger/fabric-chaincode-evm/mocks/fabproxy"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
@@ -353,21 +357,25 @@ var _ = Describe("Ethservice", func() {
 
 	Describe("GetTransactionReceipt", func() {
 		var (
+			sampleResponse      channel.Response
 			sampleTransaction   *peer.ProcessedTransaction
 			otherTransaction    *peer.ProcessedTransaction
 			sampleBlock         *common.Block
 			sampleTransactionID string
+			sampleAddress       string
 		)
 
 		BeforeEach(func() {
-			var err error
+			sampleResponse = channel.Response{}
 
+			sampleAddress = "82373458164820947891"
 			sampleTransactionID = "1234567123"
-			sampleTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample arg 2")}, []byte("sample-response"), sampleTransactionID)
+
+			var err error
+			sampleTransaction, err = GetSampleTransaction([][]byte{[]byte(sampleAddress), []byte("sample arg 2")}, []byte("sample-response"), []byte{}, sampleTransactionID)
 			Expect(err).ToNot(HaveOccurred())
 
-			otherTransaction, err = GetSampleTransaction([][]byte{[]byte("1234567"), []byte("sample arg 3")}, []byte("sample-response 2"), "5678")
-			Expect(err).ToNot(HaveOccurred())
+			otherTransaction, err = GetSampleTransaction([][]byte{[]byte("1234567"), []byte("sample arg 3")}, []byte("sample-response 2"), []byte{}, "5678")
 
 			sampleBlock = GetSampleBlockWithTransaction(31, []byte("12345abcd"), otherTransaction, sampleTransaction)
 			Expect(err).ToNot(HaveOccurred())
@@ -393,8 +401,96 @@ var _ = Describe("Ethservice", func() {
 				BlockNumber:       "0x1f",
 				GasUsed:           0,
 				CumulativeGasUsed: 0,
-				To:                "0x82373458",
+				To:                "0x" + sampleAddress,
+				Status: "0x1",
 			}))
+		})
+
+		Context("when the transaction has associated events", func() {
+			var (
+				msg          events.EventDataLog
+				eventPayload []byte
+				eventBytes   []byte
+			)
+
+			BeforeEach(func() {
+				var err error
+				addr, err := account.AddressFromBytes([]byte(sampleAddress))
+				Expect(err).ToNot(HaveOccurred())
+
+				msg = events.EventDataLog{
+					Address: addr,
+					Topics:  []binary.Word256{binary.RightPadWord256([]byte("sample-topic-1")), binary.RightPadWord256([]byte("sample-topic2"))},
+					Data:    []byte("sample-data"),
+					Height:  0,
+				}
+				events := []events.EventDataLog{msg}
+				eventPayload, err = json.Marshal(events)
+				Expect(err).ToNot(HaveOccurred())
+
+				chaincodeEvent := peer.ChaincodeEvent{
+					ChaincodeId: "qscc",
+					TxId:        sampleTransactionID,
+					EventName:   "Chaincode event",
+					Payload:     eventPayload,
+				}
+
+				eventBytes, err = proto.Marshal(&chaincodeEvent)
+				Expect(err).ToNot(HaveOccurred())
+
+				tx, err := GetSampleTransaction([][]byte{[]byte(sampleAddress), []byte("sample arg 2")}, []byte("sample-response"), eventBytes, sampleTransactionID)
+				*sampleTransaction = *tx
+				Expect(err).ToNot(HaveOccurred())
+
+				*sampleBlock = *GetSampleBlockWithTransaction(31, []byte("12345abcd"), sampleTransaction, otherTransaction)
+			})
+
+			It("returns the transaction receipt associated to that transaction address", func() {
+				var reply fabproxy.TxReceipt
+
+				err := ethservice.GetTransactionReceipt(&http.Request{}, &sampleTransactionID, &reply)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(mockLedgerClient.QueryBlockByTxIDCallCount()).To(Equal(1))
+				txID, reqOpts := mockLedgerClient.QueryBlockByTxIDArgsForCall(0)
+				Expect(txID).To(Equal(fab.TransactionID(sampleTransactionID)))
+				Expect(reqOpts).To(HaveLen(0))
+
+				topics := []string{}
+				for _, topic := range msg.Topics {
+					topics = append(topics, "0x"+hex.EncodeToString(topic.Bytes()))
+				}
+
+				expectedLog := fabproxy.Log{
+					Address:     "0x" + hex.EncodeToString([]byte(sampleAddress)),
+					Topics:      topics,
+					Data:        "0x" + hex.EncodeToString(msg.Data),
+					BlockNumber: "0x1f",
+					TxHash:      "0x" + sampleTransactionID,
+					TxIndex:     "0x0",
+					BlockHash:   "0x" + hex.EncodeToString(sampleBlock.GetHeader().GetDataHash()),
+					Index:       "0x0",
+				}
+
+				var expectedLogs []fabproxy.Log
+				expectedLogs = make([]fabproxy.Log, 0)
+				expectedLogs = append(expectedLogs, expectedLog)
+
+				// var expectedBloom fabproxy.Bloom
+				// expectedBloom = fabproxy.CreateBloom(expectedLogs)
+
+				Expect(reply).To(Equal(fabproxy.TxReceipt{
+					TransactionHash:   "0x" + sampleTransactionID,
+					TransactionIndex:  "0x0",
+					BlockHash:         "0x" + hex.EncodeToString(sampleBlock.GetHeader().GetDataHash()),
+					BlockNumber:       "0x1f",
+					GasUsed:           0,
+					CumulativeGasUsed: 0,
+					To:                "0x" + sampleAddress,
+					Logs:              expectedLogs,
+					Status:					"0x1",
+				}))
+			})
+
 		})
 
 		Context("when the transaction is creation of a smart contract", func() {
@@ -404,7 +500,7 @@ var _ = Describe("Ethservice", func() {
 				zeroAddress := make([]byte, hex.EncodedLen(len(fabproxy.ZeroAddress)))
 				hex.Encode(zeroAddress, fabproxy.ZeroAddress)
 
-				tx, err := GetSampleTransaction([][]byte{zeroAddress, []byte("sample arg 2")}, contractAddress, sampleTransactionID)
+				tx, err := GetSampleTransaction([][]byte{zeroAddress, []byte("sample arg 2")}, contractAddress, []byte{}, sampleTransactionID)
 				*sampleTransaction = *tx
 				Expect(err).ToNot(HaveOccurred())
 
@@ -430,6 +526,8 @@ var _ = Describe("Ethservice", func() {
 					ContractAddress:   string(contractAddress),
 					GasUsed:           0,
 					CumulativeGasUsed: 0,
+					Logs:              nil,
+					Status:					"0x1",
 				}))
 			})
 
@@ -456,6 +554,8 @@ var _ = Describe("Ethservice", func() {
 						ContractAddress:   string(contractAddress),
 						GasUsed:           0,
 						CumulativeGasUsed: 0,
+						Logs:              nil,
+					Status:					"0x1",
 					}))
 				})
 			})
@@ -473,13 +573,13 @@ var _ = Describe("Ethservice", func() {
 				txnID2 = "2234567123"
 				txnID3 = "3234567123"
 
-				tooFewArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458")}, []byte("sample-response"), txnID1)
+				tooFewArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458")}, []byte("sample-response"), []byte{}, txnID1)
 				Expect(err).ToNot(HaveOccurred())
 
-				tooManyArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample-arg2"), []byte("sample-arg3")}, []byte("sample-response"), txnID2)
+				tooManyArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample-arg2"), []byte("sample-arg3")}, []byte("sample-response"), []byte{}, txnID2)
 				Expect(err).ToNot(HaveOccurred())
 
-				getCodeTransaction, err = GetSampleTransaction([][]byte{[]byte("getCode"), []byte("sample-arg")}, []byte("sample-response 2"), txnID3)
+				getCodeTransaction, err = GetSampleTransaction([][]byte{[]byte("getCode"), []byte("sample-arg")}, []byte("sample-response 2"), []byte{}, txnID3)
 				Expect(err).ToNot(HaveOccurred())
 
 				sampleBlock = GetSampleBlockWithTransaction(31, []byte("12345abcd"), tooFewArgsTransaction, tooManyArgsTransaction, getCodeTransaction)
@@ -500,6 +600,7 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:       "0x1f",
 					GasUsed:           0,
 					CumulativeGasUsed: 0,
+					Status:					"0x1",
 				}))
 			})
 
@@ -515,6 +616,7 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:       "0x1f",
 					GasUsed:           0,
 					CumulativeGasUsed: 0,
+										Status:					"0x1",
 				}))
 			})
 
@@ -530,6 +632,7 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:       "0x1f",
 					GasUsed:           0,
 					CumulativeGasUsed: 0,
+										Status:					"0x1",
 				}))
 			})
 		})
@@ -902,13 +1005,13 @@ var _ = Describe("Ethservice", func() {
 				txnID2 = "2234567123"
 				txnID3 = "3234567123"
 
-				tooFewArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458")}, []byte("sample-response"), txnID1)
+				tooFewArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458")}, []byte("sample-response"), []byte{}, txnID1)
 				Expect(err).ToNot(HaveOccurred())
 
-				tooManyArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample-arg2"), []byte("sample-arg3")}, []byte("sample-response"), txnID2)
+				tooManyArgsTransaction, err = GetSampleTransaction([][]byte{[]byte("82373458"), []byte("sample-arg2"), []byte("sample-arg3")}, []byte("sample-response"), []byte{}, txnID2)
 				Expect(err).ToNot(HaveOccurred())
 
-				getCodeTransaction, err = GetSampleTransaction([][]byte{[]byte("getCode"), []byte("sample-arg")}, []byte("sample-response 2"), txnID3)
+				getCodeTransaction, err = GetSampleTransaction([][]byte{[]byte("getCode"), []byte("sample-arg")}, []byte("sample-response 2"), []byte{}, txnID3)
 				Expect(err).ToNot(HaveOccurred())
 
 				sampleBlock = GetSampleBlockWithTransaction(31, []byte("12345abcd"), tooFewArgsTransaction, tooManyArgsTransaction, getCodeTransaction)
@@ -960,12 +1063,12 @@ var _ = Describe("Ethservice", func() {
 })
 
 func GetSampleBlock(blockNumber uint64) *common.Block {
-	tx, err := GetSampleTransaction([][]byte{[]byte("12345678"), []byte("sample arg 1")}, []byte("sample-response1"), "5678")
+	tx, err := GetSampleTransaction([][]byte{[]byte("12345678"), []byte("sample arg 1")}, []byte("sample-response1"), []byte{}, "5678")
 	Expect(err).ToNot(HaveOccurred())
 	txn1, err := proto.Marshal(tx.TransactionEnvelope)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err = GetSampleTransaction([][]byte{[]byte("98765432"), []byte("sample arg 2")}, []byte("sample-response2"), "1234")
+	tx, err = GetSampleTransaction([][]byte{[]byte("98765432"), []byte("sample arg 2")}, []byte("sample-response2"), []byte{}, "1234")
 	txn2, err := proto.Marshal(tx.TransactionEnvelope)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -976,6 +1079,7 @@ func GetSampleBlock(blockNumber uint64) *common.Block {
 			PreviousHash: phash,
 			DataHash:     dhash},
 		Data: &common.BlockData{Data: [][]byte{txn1, txn2}},
+		Metadata: &common.BlockMetadata{Metadata:[][]byte{{0},{0},{0,0,0,0,0,0}}},
 	}
 }
 
@@ -996,12 +1100,14 @@ func GetSampleBlockWithTransaction(blockNumber uint64, blkHash []byte, txns ...*
 			PreviousHash: phash,
 			DataHash:     blkHash},
 		Data: &common.BlockData{Data: blockData},
+		Metadata: &common.BlockMetadata{Metadata:[][]byte{{0},{0},{0,0,0,0,0,0}}},
 	}
 }
 
-func GetSampleTransaction(inputArgs [][]byte, txResponse []byte, txId string) (*peer.ProcessedTransaction, error) {
+func GetSampleTransaction(inputArgs [][]byte, txResponse, eventBytes []byte, txId string) (*peer.ProcessedTransaction, error) {
 
 	respPayload := &peer.ChaincodeAction{
+		Events: eventBytes,
 		Response: &peer.Response{
 			Payload: txResponse,
 		},
