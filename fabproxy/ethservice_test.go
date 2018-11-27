@@ -8,6 +8,7 @@ package fabproxy_test
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -791,6 +792,37 @@ var _ = Describe("Ethservice", func() {
 			Expect(reply.TransactionIndex).To(Equal("0x1"), "txn Index")
 			Expect(reply.To).To(Equal("0x98765432"))
 			Expect(reply.Input).To(Equal("0xsample arg 2"))
+		})
+	})
+})
+
+var _ = Describe("ethereum json rpc structs", func() {
+	Context("should have specific fields", func() {
+		By("that match case exactly, in camelCase starting with a lowercase letter")
+		assertTypeMarshalsJsonFields := func(fieldNames []string, itype interface{}) {
+			b, err := json.Marshal(itype)
+			Expect(err).ToNot(HaveOccurred())
+			m := make(map[string]interface{})
+			err = json.Unmarshal(b, &m)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(m).To(HaveLen(len(fieldNames)), "did you add a field to this type?")
+			for _, fieldName := range fieldNames {
+				_, ok := m[fieldName]
+				Expect(ok).To(BeTrue(), "couldn't find an expected field %q in this type", fieldName)
+			}
+		}
+
+		It("for TxReceipt", func() {
+			fieldNames := []string{"transactionHash", "blockHash", "blockNumber", "contractAddress", "gasUsed", "cumulativeGasUsed"}
+			assertTypeMarshalsJsonFields(fieldNames, fabproxy.TxReceipt{})
+		})
+		It("for Transaction", func() {
+			fieldNames := []string{"blockHash", "blockNumber", "to", "input", "transactionIndex", "hash"}
+			assertTypeMarshalsJsonFields(fieldNames, fabproxy.Transaction{})
+		})
+		It("for Block", func() {
+			fieldNames := []string{"number", "hash", "parentHash", "transactions"}
+			assertTypeMarshalsJsonFields(fieldNames, fabproxy.Block{})
 		})
 	})
 })
