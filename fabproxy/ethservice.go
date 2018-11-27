@@ -9,6 +9,7 @@ package fabproxy
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/gogo/protobuf/proto"
+	"github.com/hyperledger/burrow/execution/evm/events"
 	"go.uber.org/zap"
 
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
@@ -88,6 +90,18 @@ type TxReceipt struct {
 	GasUsed           int    `json:"gasUsed"`
 	CumulativeGasUsed int    `json:"cumulativeGasUsed"`
 	To                string `json:"to"`
+	Logs              []Log  `json:"logs"`
+}
+
+type Log struct {
+	Address     string   `json:"address"`
+	Topics      []string `json:"topics"`
+	Data        string   `json:"data"`
+	BlockNumber string   `json:"blockNumber"`
+	TxHash      string   `json:"transactionHash"`
+	TxIndex     string   `json:"transactionIndex"`
+	BlockHash   string   `json:"blockHash"`
+	Index       string   `json:"logIndex"`
 }
 
 // Transaction represents an ethereum evm transaction.
@@ -164,7 +178,6 @@ func (s *ethService) SendTransaction(r *http.Request, args *EthArgs, reply *stri
 	if err != nil {
 		return errors.New(fmt.Sprintf("Failed to execute transaction: %s", err.Error()))
 	}
-
 	*reply = string(response.TransactionID)
 	return nil
 }
@@ -208,8 +221,45 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 			receipt.To = "0x" + to
 		}
 	}
-	*reply = receipt
 
+	if respPayload.Events != nil {
+		chaincodeEvent, err := getChaincodeEvents(respPayload)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Failed to decode chaincode event: %s", err.Error()))
+		}
+
+		var eventMsgs []events.EventDataLog
+		err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
+		if err != nil {
+			return errors.New(fmt.Sprintf("Failed to unmarshal chaincode event payload: %s", err.Error()))
+		}
+
+		var txLogs []Log
+		txLogs = make([]Log, 0)
+		for i, evDataLog := range eventMsgs {
+			topics := []string{}
+			for _, topic := range evDataLog.Topics {
+				topics = append(topics, "0x"+hex.EncodeToString(topic.Bytes()))
+			}
+			logObj := Log{
+				Address:     "0x" + strings.ToLower(evDataLog.Address.String()),
+				Topics:      topics,
+				Data:        "0x" + hex.EncodeToString(evDataLog.Data),
+				BlockNumber: receipt.BlockNumber,
+				TxHash:      "0x" + *txID,
+				TxIndex:     receipt.TransactionIndex,
+				BlockHash:   "0x" + hex.EncodeToString(blkHeader.GetDataHash()),
+				Index:       "0x" + strconv.FormatUint(uint64(i), 16),
+				// Type:      "mined",
+			}
+			txLogs = append(txLogs, logObj)
+		}
+		receipt.Logs = txLogs
+	} else {
+		receipt.Logs = nil
+	}
+
+	*reply = receipt
 	return nil
 }
 
@@ -510,7 +560,7 @@ func getTransactionInformation(payload *common.Payload) (string, string, *peer.C
 
 	if len(args) != 2 || string(args[0]) == "getCode" {
 		// no more data available to fill the transaction
-		return "", "", nil, nil
+		return "", "", respPayload, nil
 	}
 
 	// At this point, this is either an EVM Contract Deploy,
@@ -553,4 +603,11 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	}
 
 	return "", &common.Payload{}, nil
+}
+
+func getChaincodeEvents(respPayload *peer.ChaincodeAction) (*peer.ChaincodeEvent, error) {
+	eBytes := respPayload.Events
+	chaincodeEvent := &peer.ChaincodeEvent{}
+	err := proto.Unmarshal(eBytes, chaincodeEvent)
+	return chaincodeEvent, err
 }
