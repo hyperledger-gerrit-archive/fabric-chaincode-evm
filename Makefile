@@ -33,7 +33,7 @@ all: checks integration-test
 
 checks: basic-checks unit-test
 
-basic-checks: license spelling linter
+basic-checks: license spelling linter build
 
 .PHONY: spelling
 spelling:
@@ -42,6 +42,13 @@ spelling:
 .PHONY: license
 license:
 	@scripts/check_license.sh
+
+.PHONY: build
+build: output/fab3
+
+.PHONY: clean
+clean:
+	rm -rf output/ node_modules/
 
 include gotools.mk
 
@@ -77,6 +84,11 @@ docker-images:
 integration-test: docker-images gotool.ginkgo
 	@echo "Running integration-test"
 	@scripts/run-integration-tests.sh
+
+.PHONY: output/fab3 # let 'go build' handle caching and whether to rebuild
+output/fab3:
+	mkdir -p output/
+	go build -o output/fab3 github.com/hyperledger/fabric-chaincode-evm/fabproxy/cmd
 
 .PHONY:
 update-mocks:
