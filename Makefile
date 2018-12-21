@@ -70,7 +70,9 @@ linter: gotool.goimports gotool.golint check-deps
 
 check-deps: gotool.dep
 	@echo "DEP: Checking for dependency issues.."
-	@scripts/check_deps.sh
+	dep version
+	dep ensure --no-vendor --dry-run
+	dep check
 
 changelog:
 	@scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
