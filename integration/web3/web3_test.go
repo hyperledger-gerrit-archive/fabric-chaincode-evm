@@ -23,7 +23,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const LongEventualTimeout = 2 * time.Minute
+const LongEventualTimeout = 5 * time.Minute
 
 var _ = Describe("Web3 Integration", func() {
 	var (
@@ -39,6 +39,8 @@ var _ = Describe("Web3 Integration", func() {
 		user1Proxy ifrit.Process
 		user2Proxy ifrit.Process
 	)
+
+	SetDefaultEventuallyPollingInterval(500 * time.Millisecond)
 
 	BeforeEach(func() {
 		var err error
@@ -128,6 +130,8 @@ var _ = Describe("Web3 Integration", func() {
 		web3Process := ifrit.Invoke(web3TestRunner)
 		Eventually(web3Process.Ready()).Should(BeClosed())
 
+		// This runs the entire web3 test in one shot, and since go receives no input during the test run until
+		// the test finally ends, the timeout should be especially long, and we should poll rather infrequently
 		Eventually(web3Process.Wait(), LongEventualTimeout).Should(Receive())
 		Expect(web3TestRunner.ExitCode()).Should(Equal(0))
 

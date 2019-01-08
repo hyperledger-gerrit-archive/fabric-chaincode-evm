@@ -62,6 +62,8 @@ var _ = Describe("Fabproxy", func() {
 		SimpleStorage helpers.Contract
 	)
 
+	SetDefaultEventuallyPollingInterval(500 * time.Millisecond)
+
 	BeforeEach(func() {
 		var err error
 		testDir, err = ioutil.TempDir("", "fab3-e2e")
