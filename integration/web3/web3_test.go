@@ -23,7 +23,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-const LongEventualTimeout = 2 * time.Minute
+const LongEventualTimeout = 30 * time.Second
+const Web3EventuallyTimeout = 5 * time.Minute
+const Web3EventuallyPollingInterval = 1 * time.Second
 
 var _ = Describe("Web3 Integration", func() {
 	var (
@@ -39,6 +41,8 @@ var _ = Describe("Web3 Integration", func() {
 		user1Proxy ifrit.Process
 		user2Proxy ifrit.Process
 	)
+
+	SetDefaultEventuallyPollingInterval(500 * time.Millisecond)
 
 	BeforeEach(func() {
 		var err error
@@ -128,7 +132,9 @@ var _ = Describe("Web3 Integration", func() {
 		web3Process := ifrit.Invoke(web3TestRunner)
 		Eventually(web3Process.Ready()).Should(BeClosed())
 
-		Eventually(web3Process.Wait(), LongEventualTimeout).Should(Receive())
+		// This runs the entire web3 test in one shot, and since go receives no input during the test run until
+		// the test finally ends, the timeout should be especially long, and we should poll rather infrequently
+		Eventually(web3Process.Wait(), Web3EventuallyTimeout, Web3EventuallyPollingInterval).Should(Receive())
 		Expect(web3TestRunner.ExitCode()).Should(Equal(0))
 
 		Expect(web3TestRunner.Buffer()).To(gbytes.Say("Successfully able to deploy Voting Smart Contract and interact with it"))

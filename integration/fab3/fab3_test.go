@@ -25,6 +25,8 @@ import (
 )
 
 const LongEventualTimeout = time.Minute
+const DefaultEventuallyTimeout = time.Second
+const DefaultEventuallyPollingInterval = 10 * time.Millisecond
 
 func sendRPCRequest(client *http.Client, method, proxyAddress string, id int, params interface{}) (*http.Response, error) {
 	request := helpers.JsonRPCRequest{
@@ -62,6 +64,8 @@ var _ = Describe("Fabproxy", func() {
 		SimpleStorage helpers.Contract
 	)
 
+	SetDefaultEventuallyPollingInterval(500 * time.Millisecond)
+
 	BeforeEach(func() {
 		var err error
 		testDir, err = ioutil.TempDir("", "fab3-e2e")
@@ -88,7 +92,7 @@ var _ = Describe("Fabproxy", func() {
 
 		networkRunner := network.NetworkGroupRunner()
 		process = ifrit.Invoke(networkRunner)
-		Eventually(process.Ready()).Should(BeClosed())
+		Eventually(process.Ready(), DefaultEventuallyTimeout, DefaultEventuallyPollingInterval).Should(BeClosed())
 		channelName = "testchannel"
 
 		proxyConfigPath, err = helpers.CreateProxyConfig(testDir, channelName, network.CryptoPath(),
