@@ -3,7 +3,7 @@ Copyright IBM Corp. All Rights Reserved.
 SPDX-License-Identifier: Apache-2.0
 */
 
-package event_test
+package eventmanager_test
 
 import (
 	. "github.com/onsi/ginkgo"
@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestStatemanager(t *testing.T) {
+func TestEventmanager(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Event Suite")
 }
