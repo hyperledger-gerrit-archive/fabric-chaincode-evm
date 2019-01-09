@@ -8,9 +8,9 @@ Web3 = require('web3')
 web3 = new Web3()
 
 
-function TestVotingContract(fabProxyAddress1, fabProxyAddress2){
-  var user1 = new Web3(new Web3.providers.HttpProvider(fabProxyAddress1))
-  var user2 = new Web3(new Web3.providers.HttpProvider(fabProxyAddress2))
+function TestVotingContract(fab3Address1, fab3Address2){
+  var user1 = new Web3(new Web3.providers.HttpProvider(fab3Address1))
+  var user2 = new Web3(new Web3.providers.HttpProvider(fab3Address2))
 
   // Get user addresses
   var user1Addr = user1.eth.accounts[0]
