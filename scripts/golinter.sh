@@ -6,6 +6,7 @@
 
 declare -a arr=(
 "./event"
+"./eventmanager"
 "./evmcc"
 "./fabproxy"
 "./integration"
