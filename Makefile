@@ -24,7 +24,7 @@ BASE_DOCKER_NS ?= hyperledger
 BASE_DOCKER_TAG=$(ARCH)-$(BASEIMAGE_RELEASE)
 FABRIC_RELEASE = 1.4
 
-PACKAGES = ./statemanager/... ./evmcc/... ./fabproxy/
+PACKAGES = ./statemanager/... ./evmcc/... ./fabproxy/ ./eventmanager/...
 
 EXECUTABLES ?= go git curl docker
 K := $(foreach exec,$(EXECUTABLES),\
