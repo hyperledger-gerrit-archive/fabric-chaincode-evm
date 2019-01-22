@@ -9,7 +9,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 
 	"go.uber.org/zap"
 
@@ -18,43 +17,83 @@ import (
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/core/config"
 	"github.com/hyperledger/fabric-sdk-go/pkg/fabsdk"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
-const usage = `Fab3 uses environment variables to be able to start communicating with a Fabric network
-	Required Environment Variables:
-	  FABPROXY_CONFIG - Path to a compatible Fabric SDK Go config file
-	  FABPROXY_USER - User identity being used for the proxy (Matches the users names in the crypto-config directory specified in the config)
-	  FABPROXY_ORG - Organization of the specified user
-	  FABPROXY_CHANNEL - Channel to be used for the transactions
-	  FABPROXY_CCID - ID of the EVM Chaincode deployed in your fabric network
-
-	Other Environment Variables:
-	  PORT - Port the Fab3 will be running on. Default is 5000
-	`
-
-var logger *zap.SugaredLogger
-
-func main() {
-	rawLogger, _ := zap.NewProduction()
-	logger = rawLogger.Named("fab3").Sugar()
-
-	cfg := grabEnvVar("FABPROXY_CONFIG", true)
-	org := grabEnvVar("FABPROXY_ORG", true)
-	user := grabEnvVar("FABPROXY_USER", true)
-	ch := grabEnvVar("FABPROXY_CHANNEL", true)
-	ccid := grabEnvVar("FABPROXY_CCID", true)
-	port := grabEnvVar("PORT", false)
-
-	portNumber := 5000
-	if port != "" {
-		var err error
-		portNumber, err = strconv.Atoi(port)
+var fab3Cmd = &cobra.Command{
+	Use:   "fab3",
+	Short: "fab3 is a web3 provider used to interact with the EVM chaincode on a Fabric Network",
+	Long:  "fab3 is a web3 provider used to interact with the EVM chaincode on a Fabric Network",
+	Args:  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		err := checkFlags()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to convert the environment variable `PORT`, %s,  to an int\n", port)
-			os.Exit(1)
+			return err
 		}
+		return run(cmd, args)
+	},
+}
+
+var cfg, user, org, ch, ccid string
+var port int
+
+func init() {
+	viper.BindEnv("config", "FAB3_CONFIG")
+	viper.BindEnv("user", "FAB3_USER")
+	viper.BindEnv("org", "FAB3_ORG")
+	viper.BindEnv("channel", "FAB3_CHANNEL")
+	viper.BindEnv("ccid", "FAB3_CCID")
+	viper.BindEnv("port")
+
+	viper.AutomaticEnv()
+
+	fab3Cmd.PersistentFlags().StringVarP(&cfg, "config", "c", "", "Path to a compatible Fabric SDK Go config file. Required if FAB3_CONFIG is not set")
+	viper.BindPFlag("config", fab3Cmd.PersistentFlags().Lookup("config"))
+
+	fab3Cmd.PersistentFlags().StringVarP(&user, "user", "u", "", "User identity being used for the proxy (Matches the users' names in the crypto-config directory specified in the config). Required if FAB3_USER is not set")
+	viper.BindPFlag("user", fab3Cmd.PersistentFlags().Lookup("user"))
+
+	fab3Cmd.PersistentFlags().StringVarP(&org, "org", "o", "", "Organization of the specified user. Required if FAB3_ORG is not set")
+	viper.BindPFlag("org", fab3Cmd.PersistentFlags().Lookup("org"))
+
+	fab3Cmd.PersistentFlags().StringVarP(&ch, "channel", "C", "", "Channel to be used for the transactions. Required if FAB3_CHANNEL is not set")
+	viper.BindPFlag("channel", fab3Cmd.PersistentFlags().Lookup("channel"))
+
+	fab3Cmd.PersistentFlags().StringVarP(&ccid, "ccid", "i", "evmcc", "ID of the EVM Chaincode deployed in your fabric network. Can also set FAB3_CCID instead")
+	viper.BindPFlag("ccid", fab3Cmd.PersistentFlags().Lookup("ccid"))
+
+	fab3Cmd.PersistentFlags().IntVarP(&port, "port", "p", 5000, "Port that Fab3 will be running on. Can also set FAB3_PORT")
+	viper.BindPFlag("port", fab3Cmd.PersistentFlags().Lookup("port"))
+}
+
+func checkFlags() error {
+	cfg = viper.GetString("config")
+	if cfg == "" {
+		return fmt.Errorf("Missing config. Please use flag --config or set FAB3_CONFIG")
 	}
 
+	user = viper.GetString("user")
+	if user == "" {
+		return fmt.Errorf("Missing user. Please use flag --user or set FAB3_USER")
+	}
+
+	org = viper.GetString("org")
+	if org == "" {
+		return fmt.Errorf("Missing org. Please use flag --org or set FAB3_ORG")
+	}
+
+	ch = viper.GetString("channel")
+	if ch == "" {
+		return fmt.Errorf("Missing channel. Please use flag --channel or set FAB3_CHANNEL")
+	}
+
+	ccid = viper.GetString("ccid")
+	port = viper.GetInt("port")
+	return nil
+}
+
+func run(cmd *cobra.Command, args []string) error {
 	sdk, err := fabsdk.New(config.FromFile(cfg))
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to create Fabric SDK Client: %s\n", err)
@@ -75,26 +114,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	rawLogger, _ := zap.NewProduction()
+	logger = rawLogger.Named("fab3").Sugar()
+
 	ethService := fabproxy.NewEthService(client, ledger, ch, ccid, logger)
 
-	logger.Infof("Starting Fab3 on port %d\n", portNumber)
+	logger.Infof("Starting Fab3 on port %d\n", port)
 	proxy := fabproxy.NewFabProxy(ethService)
-	err = proxy.Start(portNumber)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error starting Fab3: %s", err)
-	}
-	defer func() {
-		logger.Info("Shutting down Fab3")
-		proxy.Shutdown()
-		logger.Info("Fab3 has exited")
-	}()
+	return proxy.Start(port)
 }
 
-func grabEnvVar(varName string, required bool) string {
-	envVar := os.Getenv(varName)
-	if required && envVar == "" {
-		fmt.Fprintf(os.Stderr, "Fab3 requires the environment variable %s to be set\n\n%s\n\n", varName, usage)
+var logger *zap.SugaredLogger
+
+func main() {
+
+	if fab3Cmd.Execute() != nil {
 		os.Exit(1)
 	}
-	return envVar
+
 }
