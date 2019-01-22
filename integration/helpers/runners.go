@@ -16,11 +16,11 @@ import (
 
 func FabProxyRunner(fabproxyBinPath, proxyConfig, org, user, channel, ccid string, port uint16) *ginkgomon.Runner {
 	cmd := exec.Command(fabproxyBinPath)
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FABPROXY_CONFIG=%s", proxyConfig))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FABPROXY_ORG=%s", org))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FABPROXY_USER=%s", user))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FABPROXY_CHANNEL=%s", channel))
-	cmd.Env = append(cmd.Env, fmt.Sprintf("FABPROXY_CCID=%s", ccid))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FAB3_CONFIG=%s", proxyConfig))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FAB3_ORG=%s", org))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FAB3_USER=%s", user))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FAB3_CHANNEL=%s", channel))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("FAB3_CCID=%s", ccid))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("PORT=%d", port))
 
 	config := ginkgomon.Config{
