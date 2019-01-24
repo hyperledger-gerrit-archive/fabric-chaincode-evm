@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -39,7 +40,7 @@ type LedgerClient interface {
 	QueryInfo(options ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 	QueryBlock(blockNumber uint64, options ...ledger.RequestOption) (*common.Block, error)
 	QueryBlockByTxID(txid fab.TransactionID, options ...ledger.RequestOption) (*common.Block, error)
-	QueryTransaction(txid fab.TransactionID, options ...ledger.RequestOption) (*peer.ProcessedTransaction, error)
+	//QueryBlockByHash(blockHash []byte, options ...ledger.RequestOption) (*common.Block, error)
 }
 
 // EthService is the rpc server implementation. Each function is an
@@ -60,6 +61,7 @@ type EthService interface {
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
+	GetLogs(*http.Request, *GetLogsArgs, *[]Log) error
 }
 
 type ethService struct {
@@ -70,6 +72,8 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 }
 
+// Incoming structs used as arguments
+
 type EthArgs struct {
 	To       string `json:"to"`
 	From     string `json:"from"`
@@ -79,6 +83,33 @@ type EthArgs struct {
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
 }
+
+// consider implementing json.unmarshal and using custom types for address and topics
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	Address interface{} `json:"address,omitempty"` // string or array of strings.
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	Topics interface{} `json:"topics,omitempty"` // array of strings or array of array of strings
+	// Array of DATA, - (optional) Array of 32 Bytes DATA topics. Topics are
+	// order-dependent. Each topic can also be an array of DATA with "or"
+	// options.
+	Blockhash string `json:"blockhash,omitempty"`
+	// DATA, 32 Bytes (optional) restricts the logs returned to the single
+	// block with the 32-byte hash blockHash. Using blockHash is equivalent
+	// to fromBlock = toBlock = the block number with hash blockHash. If
+	// blockHash is present in the filter criteria, then neither fromBlock
+	// nor toBlock are allowed.
+}
+
+// structs being returned
 
 type TxReceipt struct {
 	TransactionHash   string `json:"transactionHash"`
@@ -236,6 +267,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		var eventMsgs []event.Event
 		err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
 		if err != nil {
+			s.logger.Info(chaincodeEvent.Payload)
 			return fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
 		}
 
@@ -457,8 +489,339 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
-func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
+// slices are in order, but maybe we should name individual fields first,second,
+// etc.  only a few individual fields.
+//
+// TODO(mhb): maybe an alias for the contained type instead of a struct?
+type topicFilter struct {
+	// topics to be or'd together
+	topics []string
+}
 
+type logFilter struct {
+	addresses []string
+	topics    []topicFilter
+}
+
+const (
+	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
+	HexEncodedTopicData     = 66 // 32 bytes, is 64 hex chars, plus two for '0x'
+)
+
+/* GetLogs
+
+try to get all local calculations done before we make any calls to remote system
+
+currently returns all logs in range with no filtering at all
+*/
+func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, reply *[]Log) error {
+	s.logger.Debug(args)
+
+	if (args.FromBlock != "" || args.ToBlock != "") && args.Blockhash != "" {
+		return fmt.Errorf("Blockhash cannot be set at the same time as From or To; blockhash %q, From %q, To %q", args.Blockhash, args.FromBlock, args.ToBlock)
+	}
+	// check for earliest
+	if args.FromBlock == "earliest" || args.ToBlock == "earliest" {
+		return fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
+	}
+	// set defaults *after* checking for input conflicts and validating
+	if args.FromBlock == "" {
+		args.FromBlock = "latest"
+	}
+	if args.ToBlock == "" {
+		args.ToBlock = "latest"
+	}
+
+	// function to create filter object from addresses and topics?
+	var lf logFilter
+	// handle the address(es)
+	// need to strip 0x prefix, as stored
+	s.logger.Debug("addresses", args.Address)
+	if singleAddress, ok := args.Address.(string); ok {
+		if len(singleAddress) != HexEncodedAddressLegnth {
+			return fmt.Errorf("address in wrong format, not 42 chars %q", singleAddress)
+		}
+		lf.addresses = append(lf.addresses, singleAddress)
+	} else if multipleAddresses, ok := args.Address.([]string); ok {
+		for _, address := range multipleAddresses {
+			if len(address) != HexEncodedAddressLegnth {
+				return fmt.Errorf("address in wrong format, not 42 chars %q", address)
+			}
+		}
+		lf.addresses = multipleAddresses
+	}
+
+	// handle the topics parsing
+	// need to strip 0x prefix, as stored
+	if args.Topics != nil {
+		//rt := reflect.TypeOf(args.Topics)
+		s.logger.Debug("topics", args.Topics)
+		// should always be a slice
+		//if rt.Kind() != reflect.Slice {
+		//	return fmt.Errorf("topics must be slice")
+		//}
+
+		if topics, ok := args.Topics.([]interface{}); !ok {
+			return fmt.Errorf("topics must be slice")
+		} else {
+			for i, topic := range topics {
+				rt := reflect.TypeOf(topic)
+				s.logger.Debug(topic, rt, rt.Kind())
+				if singleTopic, ok := topic.(string); ok {
+					s.logger.Debug("single topic", "index", i)
+					lf.topics = append(lf.topics, topicFilter{[]string{strip0x(singleTopic)}})
+				} else if multipleTopic, ok := topic.([]interface{}); ok {
+					s.logger.Debug("or'd topics", "index", i)
+					var tf topicFilter
+					for _, singleTopic := range multipleTopic {
+						if stringTopic, ok := singleTopic.(string); ok {
+							tf.topics = append(tf.topics, strip0x(stringTopic))
+						} else {
+							return fmt.Errorf("all topics must be strings")
+						}
+					}
+					lf.topics = append(lf.topics, tf)
+				} else {
+					return fmt.Errorf("some unparsable trash", topic)
+				}
+			}
+		}
+		// create topic filter
+		// filter.AddTopicFilter
+		//var topicSlice []interface{}
+
+		//have interface{}
+		//
+		// should be a slice of something
+		//
+		// slice of strings
+		//
+		// slice of slices
+
+		/*
+			for i, topic := range topicSlice {
+			if singleTopic, ok := topic.(string); ok {
+					s.logger.Debug("single topic", "index", i)
+					lf.topics = append(lf.topics, topicFilter{[]string{singleTopic}})
+				} else if multipleTopic, ok := topic.([]string); ok {
+					s.logger.Debug("or'd topics", "index", i)
+					lf.topics = append(lf.topics, topicFilter{multipleTopic})
+				}
+			}
+		*/
+	}
+	s.logger.Debug("Final Filter", lf)
+
+	/* OPTIONS
+
+		   1. make filter and apply while iterating
+
+		   2. accumulate all the logs and filter after.
+
+	           3. don't do anything until we know we have to filter, then parse the
+	           filters there (probably better to fail fast on a non-appropriate
+	           filter.
+
+		   Z. cache everything we see while iterating
+	*/
+
+	/* if blockhash is set, this is a single block being parsed
+
+		 TODO prep blockhash for sending to fabric
+
+	         or do a query lookup of what blockNumber it is, and then a common case
+	         of handleBlock, same as below.  */
+	if args.Blockhash != "" {
+		// block, err := s.ledgerClient.QueryBlockByHash(args.Blockhash)
+		// if err != nil {
+		// 	return fmt.Errorf("Failed to query the ledger: %v", err)
+		// }
+		// TODO handle the block
+		return nil
+	}
+
+	// maybe check if both from and to are 'latest' to avoid doing a query
+	// twice and coming out with different answers each time, which doesn't
+	// hurt, but is weird.
+
+	from, err := s.parseBlockNum(strip0x(args.FromBlock))
+	if err != nil {
+		return err
+	}
+	to, err := s.parseBlockNum(strip0x(args.ToBlock))
+	if err != nil {
+		return err
+	}
+	if from > to {
+		return fmt.Errorf("first block number greater than last block number")
+	}
+
+	var txLogs []Log
+	//txLogs = make([]Log, 0)
+
+	// possibly multiple blocks in a range
+	// TODO start handling each individual block in a loop
+	s.logger.Debug("handling blocks", "from", from, "to", to)
+	for blockNumber := from; blockNumber <= to; blockNumber++ {
+		s.logger.Debug("block", blockNumber)
+		// TODO handle the block
+		//
+		// func getFilteredLogsInBlock(blockNumber, filter)
+		block, err := s.ledgerClient.QueryBlock(blockNumber)
+		if err != nil {
+			return fmt.Errorf("Failed to query the ledger: %v", err)
+		}
+		blockHeader := block.GetHeader()
+		blockHash := "0x" + hex.EncodeToString(blockHeader.GetDataHash())
+		blockData := block.GetData().GetData()
+		s.logger.Debug("handling ", len(blockData), " transactions in block")
+		for transactionIndex, transactionData := range blockData {
+			if transactionData == nil { // can a data be empty? Is this an error?
+				continue
+			}
+			env := &common.Envelope{}
+			if err := proto.Unmarshal(transactionData, env); err != nil {
+				return err
+			}
+
+			payload := &common.Payload{}
+			if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
+				return err
+			}
+			chdr := &common.ChannelHeader{}
+			if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+				return err
+			}
+
+			transactionHash := chdr.TxId
+			s.logger.Debug("transaction ", transactionIndex, " has hash ", transactionHash)
+			// return of findtransaction equiv
+
+			// alternate
+			var respPayload *peer.ChaincodeAction
+			_, _, respPayload, err = getTransactionInformation(payload)
+			// end alternate
+
+			/* original impl
+			txActions := &peer.Transaction{}
+			err := proto.Unmarshal(payload.GetData(), txActions)
+			if err != nil {
+				return err
+			}
+			// check validness of transaction and abandon
+			// if notValid {
+			// continue;
+			// }
+
+			_, respPayload, err = getPayloads(txActions.GetActions()[0])
+			if err != nil {
+				s.logger.Debug(txActions.GetActions())
+				return fmt.Errorf("Failed to unmarshal transaction: %s", err)
+			}
+			*/
+			s.logger.Debug("transaction payload", respPayload)
+			if respPayload.Events != nil {
+				chaincodeEvent, err := getChaincodeEvents(respPayload)
+				if err != nil {
+					return fmt.Errorf("Failed to decode chaincode event: %s", err)
+				}
+
+				//Begin common code as "pull all logs out of txn"
+				//
+				// could format as "pull filtered logs out, with
+				// an optional filter, and default to "all logs"
+				// and reuse same code in existing areas.
+				var eventMsgs []event.Event
+				err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
+				if err != nil {
+					return fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
+				}
+
+				s.logger.Debug("checking events", eventMsgs)
+
+				for i, logEvent := range eventMsgs {
+					s.logger.Debug("checking event", i, logEvent)
+					if len(lf.addresses) > 0 {
+						s.logger.Debug("checking event for matching dddress")
+						foundMatch := false
+						for _, address := range lf.addresses { // if no address, empty range, skipped
+							s.logger.Debug("matching address", "matcherAddress", address, "eventAddress", logEvent.Address)
+							if logEvent.Address == address {
+								foundMatch = true
+								break
+							}
+						}
+						if foundMatch == false {
+							continue // no match, move to next logEvent
+						}
+					}
+
+					// if there are fewer topics in the event than topics in the filter, it cannot match
+					if len(logEvent.Topics) < len(lf.topics) {
+						s.logger.Debug("skipping event because topics have different lengths and can never match")
+						continue
+					}
+
+					s.logger.Debug("checking for topics")
+					allMatch := true // opposite is any not match
+					// check match for each topic,
+					for i, topicFilter := range lf.topics {
+						// if filter is empty it matches automatically.
+						if len(topicFilter.topics) == 0 {
+							continue
+						}
+
+						eventTopic := logEvent.Topics[i]
+						foundMatch := false
+						for _, topic := range topicFilter.topics {
+							s.logger.Debug("matching Topic ", "matcherTopic", topic, "eventTopic", eventTopic)
+							if topic == eventTopic || topic == "" {
+								foundMatch = true
+								break
+							}
+						}
+						if foundMatch == false {
+							allMatch = false
+							// if we didn't find a match, no use in checking any of the other topics
+							break
+						}
+
+					}
+					if allMatch == false {
+						continue
+					}
+
+					// everything matches, construct the log to return
+					topics := []string{}
+					for _, topic := range logEvent.Topics {
+						// each topic is a hexencoded word256
+						topics = append(topics, "0x"+topic)
+					}
+					logObj := Log{
+						Address:     "0x" + logEvent.Address,
+						Topics:      topics,
+						Data:        "0x" + logEvent.Data,
+						BlockNumber: "0x" + strconv.FormatUint(blockNumber, 16),
+						TxHash:      transactionHash,
+						TxIndex:     "0x" + strconv.FormatUint(uint64(transactionIndex), 16),
+						BlockHash:   blockHash,
+						Index:       "0x" + strconv.FormatUint(uint64(i), 16),
+					}
+					txLogs = append(txLogs, logObj)
+				}
+			}
+		}
+	}
+
+	s.logger.Debug("returning logs", txLogs)
+
+	s.logger.Debug("logs before being set", reply)
+	*reply = txLogs
+
+	return nil
+}
+
+func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
 	return s.channelClient.Query(channel.Request{
 		ChaincodeID: ccid,
 		Fcn:         function,
@@ -490,7 +853,6 @@ func (s *ethService) parseBlockNum(input string) (uint64, error) {
 	case "pending":
 		return 0, fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
 	default:
-
 		return strconv.ParseUint(input, 16, 64)
 	}
 }
