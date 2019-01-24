@@ -223,6 +223,15 @@ var _ = Describe("Fab3", func() {
 		Expect(respBody.Error).To(BeZero())
 		Expect(respBody.Result).To(Equal(receipt.BlockNumber))
 		checkHexEncoded(respBody.Result)
+
+		By("querying for logs of a contract with no logs, we get no logs")
+		resp, err = sendRPCRequest(client, "eth_GetLogs", proxyAddress, 20, []interface{}{})
+		Expect(err).ToNot(HaveOccurred())
+		rBody, err = ioutil.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
+		err = json.Unmarshal(rBody, &respArrayBody)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(respArrayBody.Result).To(HaveLen(0))
 	})
 
 	It("shuts down gracefully when it receives an Interrupt signal", func() {
