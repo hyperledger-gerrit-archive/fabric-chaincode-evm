@@ -29,18 +29,22 @@ import (
 var ZeroAddress = make([]byte, 20)
 
 //go:generate counterfeiter -o ../mocks/fab3/mockchannelclient.go --fake-name MockChannelClient ./ ChannelClient
+
 type ChannelClient interface {
 	Query(request channel.Request, options ...channel.RequestOption) (channel.Response, error)
 	Execute(request channel.Request, options ...channel.RequestOption) (channel.Response, error)
 }
 
 //go:generate counterfeiter -o ../mocks/fab3/mockledgerclient.go --fake-name MockLedgerClient ./ LedgerClient
+
 type LedgerClient interface {
 	QueryInfo(options ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 	QueryBlock(blockNumber uint64, options ...ledger.RequestOption) (*common.Block, error)
 	QueryBlockByTxID(txid fab.TransactionID, options ...ledger.RequestOption) (*common.Block, error)
 	QueryTransaction(txid fab.TransactionID, options ...ledger.RequestOption) (*peer.ProcessedTransaction, error)
 }
+
+//go:generate counterfeiter -o ../mocks/fab3/mockethservice.go --fake-name MockEthService ./ EthService
 
 // EthService is the rpc server implementation. Each function is an
 // implementation of one ethereum json-rpc
@@ -49,7 +53,11 @@ type LedgerClient interface {
 // Arguments and return values are formatted as HEX value encoding
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#hex-value-encoding
 //
-//go:generate counterfeiter -o ../mocks/fab3/mockethservice.go --fake-name MockEthService ./ EthService
+// gorilla RPC is the receiver of these functions, they must all take three
+// pointers, and return a single error
+//
+// see godoc for RegisterService(receiver interface{}, name string) error
+//
 type EthService interface {
 	GetCode(r *http.Request, arg *string, reply *string) error
 	Call(r *http.Request, args *EthArgs, reply *string) error
@@ -60,6 +68,7 @@ type EthService interface {
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
+	GetLogs(*http.Request, *GetLogsArgs, *[]Log) error
 }
 
 type ethService struct {
@@ -70,6 +79,8 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 }
 
+// Incoming structs used as arguments
+
 type EthArgs struct {
 	To       string `json:"to"`
 	From     string `json:"from"`
@@ -79,6 +90,20 @@ type EthArgs struct {
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
 }
+
+// consider implementing json.unmarshal and using custom types for address and topics
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+}
+
+// structs being returned
 
 type TxReceipt struct {
 	TransactionHash   string `json:"transactionHash"`
@@ -228,15 +253,9 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 	}
 
 	if respPayload.Events != nil {
-		chaincodeEvent, err := getChaincodeEvents(respPayload)
+		eventMsgs, err := getChaincodeEvents(respPayload)
 		if err != nil {
-			return fmt.Errorf("Failed to decode chaincode event: %s", err)
-		}
-
-		var eventMsgs []event.Event
-		err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
-		if err != nil {
-			return fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
+			return fmt.Errorf("couldn't get events: %s", err)
 		}
 
 		var txLogs []Log
@@ -352,18 +371,9 @@ func (s *ethService) GetBlockByNumber(r *http.Request, p *[]interface{}, reply *
 		if transactionData == nil {
 			continue
 		}
-		env := &common.Envelope{}
-		if err := proto.Unmarshal(transactionData, env); err != nil {
-			return err
-		}
 
-		payload := &common.Payload{}
-		if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
-			return err
-		}
-
-		chdr := &common.ChannelHeader{}
-		if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+		payload, chdr, err := getChannelHeaderandPayloadFromBlockdata(transactionData)
+		if err != nil {
 			return err
 		}
 
@@ -457,8 +467,135 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
-func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
+/*
+GetLogs currently returns all logs in range FromBlock to ToBlock
+*/
+func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) error {
+	s.logger.Debug(args)
 
+	// check for earliest
+	if args.FromBlock == "earliest" || args.ToBlock == "earliest" {
+		return fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
+	}
+	// set defaults *after* checking for input conflicts and validating
+	if args.FromBlock == "" {
+		args.FromBlock = "latest"
+	}
+	if args.ToBlock == "" {
+		args.ToBlock = "latest"
+	}
+
+	var from, to uint64
+	from, err := s.parseBlockNum(strip0x(args.FromBlock))
+	if err != nil {
+		return err
+	}
+	// check if both from and to are the same to avoid doing two
+	// queries to the fabric network.
+	if args.FromBlock == args.ToBlock {
+		to = from
+	} else {
+		to, err = s.parseBlockNum(strip0x(args.ToBlock))
+		if err != nil {
+			return err
+		}
+	}
+
+	if from > to {
+		return fmt.Errorf("first block number greater than last block number")
+	}
+
+	var txLogs []Log
+
+	s.logger.Debug("handling blocks", "from", from, "to", to)
+	for blockNumber := from; blockNumber <= to; blockNumber++ {
+		s.logger.Debug("block", blockNumber)
+
+		block, err := s.ledgerClient.QueryBlock(blockNumber)
+		if err != nil {
+			return fmt.Errorf("Failed to query the ledger: %v", err)
+		}
+		blockHeader := block.GetHeader()
+		blockHash := "0x" + hex.EncodeToString(blockHeader.GetDataHash())
+		blockData := block.GetData().GetData()
+		transactionsFilter := block.GetMetadata().GetMetadata()[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
+		s.logger.Debug("handling ", len(blockData), " transactions in block")
+		for transactionIndex, transactionData := range blockData {
+			// check validity of transaction
+			if transactionsFilter[transactionIndex] == 1 {
+				continue
+			}
+			if transactionData == nil {
+				continue
+			}
+
+			// start processing the transaction
+			payload, chdr, err := getChannelHeaderandPayloadFromBlockdata(transactionData)
+			if err != nil {
+				return err
+			}
+
+			transactionHash := chdr.TxId
+			s.logger.Debug("transaction ", transactionIndex, " has hash ", transactionHash)
+
+			var respPayload *peer.ChaincodeAction
+			_, _, respPayload, err = getTransactionInformation(payload)
+
+			s.logger.Debug("transaction payload", respPayload)
+			if respPayload.Events != nil {
+				eventMsgs, err := getChaincodeEvents(respPayload)
+				if err != nil {
+					return fmt.Errorf("couldn't get events: %s", err)
+				}
+
+				s.logger.Debug("checking events", eventMsgs)
+
+				for i, logEvent := range eventMsgs {
+					topics := []string{}
+					for _, topic := range logEvent.Topics {
+						// each topic is a hexencoded word256
+						topics = append(topics, "0x"+topic)
+					}
+					logObj := Log{
+						Address:     "0x" + logEvent.Address,
+						Topics:      topics,
+						Data:        "0x" + logEvent.Data,
+						BlockNumber: "0x" + strconv.FormatUint(blockNumber, 16),
+						TxHash:      transactionHash,
+						TxIndex:     "0x" + strconv.FormatUint(uint64(transactionIndex), 16),
+						BlockHash:   blockHash,
+						Index:       "0x" + strconv.FormatUint(uint64(i), 16),
+					}
+					txLogs = append(txLogs, logObj)
+				}
+			}
+		}
+	}
+
+	s.logger.Debug("returning logs", txLogs)
+	*logs = txLogs
+
+	return nil
+}
+
+func getChannelHeaderandPayloadFromBlockdata(transactionData []byte) (*common.Payload, *common.ChannelHeader, error) {
+	env := &common.Envelope{}
+	if err := proto.Unmarshal(transactionData, env); err != nil {
+		return nil, nil, err
+	}
+
+	payload := &common.Payload{}
+	if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
+		return nil, nil, err
+	}
+	chdr := &common.ChannelHeader{}
+	if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+		return nil, nil, err
+	}
+	return payload, chdr, nil
+}
+
+func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
 	return s.channelClient.Query(channel.Request{
 		ChaincodeID: ccid,
 		Fcn:         function,
@@ -490,7 +627,6 @@ func (s *ethService) parseBlockNum(input string) (uint64, error) {
 	case "pending":
 		return 0, fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
 	default:
-
 		return strconv.ParseUint(input, 16, 64)
 	}
 }
@@ -582,18 +718,9 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 		if transactionData == nil { // can a data be empty? Is this an error?
 			continue
 		}
-		env := &common.Envelope{}
-		if err := proto.Unmarshal(transactionData, env); err != nil {
-			return "", &common.Payload{}, err
-		}
 
-		payload := &common.Payload{}
-		if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
-			return "", &common.Payload{}, err
-		}
-
-		chdr := &common.ChannelHeader{}
-		if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+		payload, chdr, err := getChannelHeaderandPayloadFromBlockdata(transactionData)
+		if err != nil {
 			return "", &common.Payload{}, err
 		}
 
@@ -609,9 +736,17 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func getChaincodeEvents(respPayload *peer.ChaincodeAction) (*peer.ChaincodeEvent, error) {
+func getChaincodeEvents(respPayload *peer.ChaincodeAction) ([]event.Event, error) {
 	eBytes := respPayload.Events
 	chaincodeEvent := &peer.ChaincodeEvent{}
 	err := proto.Unmarshal(eBytes, chaincodeEvent)
-	return chaincodeEvent, err
+	if err != nil {
+		return nil, fmt.Errorf("Failed to decode chaincode event: %s", err)
+	}
+	var eventMsgs []event.Event
+	err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
+	}
+	return eventMsgs, nil
 }
