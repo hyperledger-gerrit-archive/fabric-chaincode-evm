@@ -25,6 +25,17 @@ type EthArgs struct {
 	Nonce    string `json:"nonce"`
 }
 
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+}
+
 /*
 Output types used as return values from ethservice methods.
 */
