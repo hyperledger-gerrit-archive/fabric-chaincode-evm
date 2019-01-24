@@ -40,7 +40,7 @@ var _ = Describe("Ethservice", func() {
 		mockLedgerClient *fab3_mocks.MockLedgerClient
 		channelID        string
 	)
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewDevelopment()
 	logger := rawLogger.Sugar()
 
 	BeforeEach(func() {
@@ -1049,6 +1049,74 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:      "0x1f",
 				}))
 			})
+		})
+	})
+
+	FDescribe("createFilter", func() {
+		// maybe test filter creation?
+		// private internal method, move to internal test
+	})
+
+	FDescribe("GetLogs", func() {
+		var logsArgs *fab3.GetLogsArgs
+		var reply *[]fab3.Log
+		var topics interface{}
+		BeforeEach(func() {
+			logsArgs = &fab3.GetLogsArgs{}
+			reply = nil
+			topics = nil
+		})
+		XIt("accepts an empty input struct by defaulting", func() {
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("0 & 0, fast path", func() {
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		FIt("empty topics", func() {
+			topics = []string{} // want empty zero length slice
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("two topics", func() {
+			topics = []string{"a", "b"}
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("three topics, one any", func() {
+			topics = []string{"a", "", "c"}
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		FIt("or'd topics", func() {
+			// gorilla parses as interfaces  of interfaces, so we should use that type when testing
+			mtopics := make([]interface{}, 3)
+			multitopic := make([]interface{}, 2)
+			multitopic[0] = "a"
+			multitopic[1] = "b"
+			mtopics[0] = multitopic
+			mtopics[1] = ""
+			mtopics[2] = "c"
+			topics = mtopics
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("fully spec'd args, single address", func() {
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Address: "0x1234", Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("fully spec'd args, array of address", func() {
+			addresses := []string{"0x1234", "0x5678"}
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0", Address: addresses, Topics: topics}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("blockhash", func() {
+			logsArgs = &fab3.GetLogsArgs{Blockhash: "0x1234"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("kicks back an error when to or from is specified with blockhash", func() {
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x00", Blockhash: "0x1234"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).ShouldNot(Succeed())
 		})
 	})
 })
