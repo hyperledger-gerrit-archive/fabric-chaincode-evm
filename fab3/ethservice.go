@@ -49,6 +49,11 @@ type LedgerClient interface {
 // Arguments and return values are formatted as HEX value encoding
 // https://github.com/ethereum/wiki/wiki/JSON-RPC#hex-value-encoding
 //
+// gorilla RPC is the receiver of these functions, they must all take three
+// pointers, and return a single error
+//
+// see godoc for RegisterService(receiver interface{}, name string) error
+//
 //go:generate counterfeiter -o ../mocks/fab3/mockethservice.go --fake-name MockEthService ./ EthService
 type EthService interface {
 	GetCode(r *http.Request, arg *string, reply *string) error
@@ -60,6 +65,7 @@ type EthService interface {
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
+	GetLogs(*http.Request, *GetLogsArgs, *[]Log) error
 }
 
 type ethService struct {
@@ -70,6 +76,8 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 }
 
+// Incoming structs used as arguments
+
 type EthArgs struct {
 	To       string `json:"to"`
 	From     string `json:"from"`
@@ -79,6 +87,20 @@ type EthArgs struct {
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
 }
+
+// consider implementing json.unmarshal and using custom types for address and topics
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+}
+
+// structs being returned
 
 type TxReceipt struct {
 	TransactionHash   string `json:"transactionHash"`
@@ -457,8 +479,134 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
-func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
+/* GetLogs
 
+try to get all local calculations done before we make any calls to remote system
+
+currently returns all logs in range with no filtering at all
+*/
+func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) error {
+	s.logger.Debug(args)
+
+	// check for earliest
+	if args.FromBlock == "earliest" || args.ToBlock == "earliest" {
+		return fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
+	}
+	// set defaults *after* checking for input conflicts and validating
+	if args.FromBlock == "" {
+		args.FromBlock = "latest"
+	}
+	if args.ToBlock == "" {
+		args.ToBlock = "latest"
+	}
+
+	// maybe check if both from and to are 'latest' to avoid doing a query
+	// twice and coming out with different answers each time, which doesn't
+	// hurt, but is weird.
+	from, err := s.parseBlockNum(strip0x(args.FromBlock))
+	if err != nil {
+		return err
+	}
+	to, err := s.parseBlockNum(strip0x(args.ToBlock))
+	if err != nil {
+		return err
+	}
+	if from > to {
+		return fmt.Errorf("first block number greater than last block number")
+	}
+
+	var txLogs []Log
+
+	s.logger.Debug("handling blocks", "from", from, "to", to)
+	for blockNumber := from; blockNumber <= to; blockNumber++ {
+		s.logger.Debug("block", blockNumber)
+
+		block, err := s.ledgerClient.QueryBlock(blockNumber)
+		if err != nil {
+			return fmt.Errorf("Failed to query the ledger: %v", err)
+		}
+		blockHeader := block.GetHeader()
+		blockHash := "0x" + hex.EncodeToString(blockHeader.GetDataHash())
+		blockData := block.GetData().GetData()
+		transactionsFilter := block.GetMetadata().GetMetadata()[common.BlockMetadataIndex_TRANSACTIONS_FILTER]
+		s.logger.Debug("handling ", len(blockData), " transactions in block")
+		for transactionIndex, transactionData := range blockData {
+			/* skip conditions */
+			{
+				// check validity of transaction
+				if transactionsFilter[transactionIndex] == 1 {
+					continue
+				}
+				if transactionData == nil {
+					continue
+				}
+			}
+			/* process the transaction */
+			env := &common.Envelope{}
+			if err := proto.Unmarshal(transactionData, env); err != nil {
+				return err
+			}
+
+			payload := &common.Payload{}
+			if err := proto.Unmarshal(env.GetPayload(), payload); err != nil {
+				return err
+			}
+			chdr := &common.ChannelHeader{}
+			if err := proto.Unmarshal(payload.GetHeader().GetChannelHeader(), chdr); err != nil {
+				return err
+			}
+
+			transactionHash := chdr.TxId
+			s.logger.Debug("transaction ", transactionIndex, " has hash ", transactionHash)
+			// return of findtransaction equiv
+
+			var respPayload *peer.ChaincodeAction
+			_, _, respPayload, err = getTransactionInformation(payload)
+
+			s.logger.Debug("transaction payload", respPayload)
+			if respPayload.Events != nil {
+				chaincodeEvent, err := getChaincodeEvents(respPayload)
+				if err != nil {
+					return fmt.Errorf("Failed to decode chaincode event: %s", err)
+				}
+
+				var eventMsgs []event.Event
+				err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
+				if err != nil {
+					return fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
+				}
+
+				s.logger.Debug("checking events", eventMsgs)
+
+				for i, logEvent := range eventMsgs {
+					topics := []string{}
+					for _, topic := range logEvent.Topics {
+						// each topic is a hexencoded word256
+						topics = append(topics, "0x"+topic)
+					}
+					logObj := Log{
+						Address:     "0x" + logEvent.Address,
+						Topics:      topics,
+						Data:        "0x" + logEvent.Data,
+						BlockNumber: "0x" + strconv.FormatUint(blockNumber, 16),
+						TxHash:      transactionHash,
+						TxIndex:     "0x" + strconv.FormatUint(uint64(transactionIndex), 16),
+						BlockHash:   blockHash,
+						Index:       "0x" + strconv.FormatUint(uint64(i), 16),
+					}
+					txLogs = append(txLogs, logObj)
+				}
+			}
+		}
+	}
+
+	s.logger.Debug("returning logs", txLogs)
+	*logs = txLogs
+
+	return nil
+}
+
+func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
 	return s.channelClient.Query(channel.Request{
 		ChaincodeID: ccid,
 		Fcn:         function,
@@ -490,7 +638,6 @@ func (s *ethService) parseBlockNum(input string) (uint64, error) {
 	case "pending":
 		return 0, fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
 	default:
-
 		return strconv.ParseUint(input, 16, 64)
 	}
 }
