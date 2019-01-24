@@ -1051,15 +1051,64 @@ var _ = Describe("Ethservice", func() {
 			})
 		})
 	})
+
+	Describe("GetLogs", func() {
+		var logsArgs *fab3.GetLogsArgs
+		var reply *[]fab3.Log
+		BeforeEach(func() {
+			logsArgs = &fab3.GetLogsArgs{}
+			reply = &[]fab3.Log{}
+		})
+		It("accepts an empty input struct by defaulting", func() {
+			mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 1}}, nil)
+			sampleBlock := GetSampleBlock(1)
+			mockLedgerClient.QueryBlockReturns(sampleBlock, nil)
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+			Expect(len(*reply)).Should(Equal(2))
+		})
+		It("returns logs when both FromBlock and ToBlock are specified", func() {
+			sampleBlock := GetSampleBlock(1)
+			mockLedgerClient.QueryBlockReturns(sampleBlock, nil)
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x1", ToBlock: "0x1"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+			Expect(len(*reply)).Should(Equal(2))
+		})
+		It("does not allow FromBlock to be greater than ToBlock", func() {
+			logsArgs = &fab3.GetLogsArgs{FromBlock: "0x1", ToBlock: "0x0"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).ShouldNot(Succeed())
+		})
+	})
 })
 
 func GetSampleBlock(blockNumber uint64) *common.Block {
-	tx, err := GetSampleTransaction([][]byte{[]byte("12345678"), []byte("sample arg 1")}, []byte("sample-response1"), []byte{}, "5678")
+	addr, err := crypto.AddressFromBytes([]byte("82373458164820947891"))
+	Expect(err).ToNot(HaveOccurred())
+
+	msg := event.Event{
+		Address: strings.ToLower(addr.String()),
+		Topics:  []string{"sample-topic-1", "sample-topic2"},
+		Data:    "sample-data",
+	}
+	events := []event.Event{msg}
+	eventPayload, err := json.Marshal(events)
+	Expect(err).ToNot(HaveOccurred())
+
+	chaincodeEvent := peer.ChaincodeEvent{
+		ChaincodeId: "qscc",
+		TxId:        "1234",
+		EventName:   "Chaincode event",
+		Payload:     eventPayload,
+	}
+
+	eventBytes, err := proto.Marshal(&chaincodeEvent)
+	Expect(err).ToNot(HaveOccurred())
+
+	tx, err := GetSampleTransaction([][]byte{[]byte("12345678"), []byte("sample arg 1")}, []byte("sample-response1"), eventBytes, "5678")
 	Expect(err).ToNot(HaveOccurred())
 	txn1, err := proto.Marshal(tx.TransactionEnvelope)
 	Expect(err).ToNot(HaveOccurred())
 
-	tx, err = GetSampleTransaction([][]byte{[]byte("98765432"), []byte("sample arg 2")}, []byte("sample-response2"), []byte{}, "1234")
+	tx, err = GetSampleTransaction([][]byte{[]byte("98765432"), []byte("sample arg 2")}, []byte("sample-response2"), eventBytes, "1234")
 	txn2, err := proto.Marshal(tx.TransactionEnvelope)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -1069,8 +1118,9 @@ func GetSampleBlock(blockNumber uint64) *common.Block {
 		Header: &common.BlockHeader{Number: blockNumber,
 			PreviousHash: phash,
 			DataHash:     dhash},
-		Data:     &common.BlockData{Data: [][]byte{txn1, txn2}},
-		Metadata: &common.BlockMetadata{Metadata: [][]byte{{0}, {0}}},
+		Data: &common.BlockData{Data: [][]byte{txn1, txn2}},
+		// each block data needs each of the metadata
+		Metadata: &common.BlockMetadata{Metadata: [][]byte{{0, 0}, {0, 0}, {0, 0}, {0, 0}}},
 	}
 }
 
