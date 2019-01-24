@@ -41,7 +41,7 @@ var _ = Describe("Ethservice", func() {
 		mockLedgerClient *fabproxy_mocks.MockLedgerClient
 		channelID        string
 	)
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewDevelopment()
 	logger := rawLogger.Sugar()
 
 	BeforeEach(func() {
@@ -1055,6 +1055,13 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:      "0x1f",
 				}))
 			})
+		})
+	})
+	Describe("GetLogs", func() {
+		var logsArgs fabproxy.GetLogsArgs
+		It("accepts an empty input struct by defaulting", func() {
+			var reply []fabproxy.Log
+			Expect(ethservice.GetLogs(&http.Request{}, &logsArgs, &reply)).Should(Succeed())
 		})
 	})
 })

@@ -2,10 +2,10 @@
 package fabproxy
 
 import (
-	http "net/http"
-	sync "sync"
+	"net/http"
+	"sync"
 
-	fabproxy "github.com/hyperledger/fabric-chaincode-evm/fabproxy"
+	"github.com/hyperledger/fabric-chaincode-evm/fabproxy"
 )
 
 type MockEthService struct {
@@ -85,6 +85,19 @@ type MockEthService struct {
 		result1 error
 	}
 	getCodeReturnsOnCall map[int]struct {
+		result1 error
+	}
+	GetLogsStub        func(*http.Request, *fabproxy.GetLogsArgs, *[]fabproxy.Log) error
+	getLogsMutex       sync.RWMutex
+	getLogsArgsForCall []struct {
+		arg1 *http.Request
+		arg2 *fabproxy.GetLogsArgs
+		arg3 *[]fabproxy.Log
+	}
+	getLogsReturns struct {
+		result1 error
+	}
+	getLogsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	GetTransactionByHashStub        func(*http.Request, *string, *fabproxy.Transaction) error
@@ -502,6 +515,68 @@ func (fake *MockEthService) GetCodeReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
+func (fake *MockEthService) GetLogs(arg1 *http.Request, arg2 *fabproxy.GetLogsArgs, arg3 *[]fabproxy.Log) error {
+	fake.getLogsMutex.Lock()
+	ret, specificReturn := fake.getLogsReturnsOnCall[len(fake.getLogsArgsForCall)]
+	fake.getLogsArgsForCall = append(fake.getLogsArgsForCall, struct {
+		arg1 *http.Request
+		arg2 *fabproxy.GetLogsArgs
+		arg3 *[]fabproxy.Log
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("GetLogs", []interface{}{arg1, arg2, arg3})
+	fake.getLogsMutex.Unlock()
+	if fake.GetLogsStub != nil {
+		return fake.GetLogsStub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.getLogsReturns
+	return fakeReturns.result1
+}
+
+func (fake *MockEthService) GetLogsCallCount() int {
+	fake.getLogsMutex.RLock()
+	defer fake.getLogsMutex.RUnlock()
+	return len(fake.getLogsArgsForCall)
+}
+
+func (fake *MockEthService) GetLogsCalls(stub func(*http.Request, *fabproxy.GetLogsArgs, *[]fabproxy.Log) error) {
+	fake.getLogsMutex.Lock()
+	defer fake.getLogsMutex.Unlock()
+	fake.GetLogsStub = stub
+}
+
+func (fake *MockEthService) GetLogsArgsForCall(i int) (*http.Request, *fabproxy.GetLogsArgs, *[]fabproxy.Log) {
+	fake.getLogsMutex.RLock()
+	defer fake.getLogsMutex.RUnlock()
+	argsForCall := fake.getLogsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *MockEthService) GetLogsReturns(result1 error) {
+	fake.getLogsMutex.Lock()
+	defer fake.getLogsMutex.Unlock()
+	fake.GetLogsStub = nil
+	fake.getLogsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) GetLogsReturnsOnCall(i int, result1 error) {
+	fake.getLogsMutex.Lock()
+	defer fake.getLogsMutex.Unlock()
+	fake.GetLogsStub = nil
+	if fake.getLogsReturnsOnCall == nil {
+		fake.getLogsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.getLogsReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *MockEthService) GetTransactionByHash(arg1 *http.Request, arg2 *string, arg3 *fabproxy.Transaction) error {
 	fake.getTransactionByHashMutex.Lock()
 	ret, specificReturn := fake.getTransactionByHashReturnsOnCall[len(fake.getTransactionByHashArgsForCall)]
@@ -703,6 +778,8 @@ func (fake *MockEthService) Invocations() map[string][][]interface{} {
 	defer fake.getBlockByNumberMutex.RUnlock()
 	fake.getCodeMutex.RLock()
 	defer fake.getCodeMutex.RUnlock()
+	fake.getLogsMutex.RLock()
+	defer fake.getLogsMutex.RUnlock()
 	fake.getTransactionByHashMutex.RLock()
 	defer fake.getTransactionByHashMutex.RUnlock()
 	fake.getTransactionReceiptMutex.RLock()
