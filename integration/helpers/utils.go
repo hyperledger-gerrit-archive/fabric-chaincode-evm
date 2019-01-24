@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 package helpers
 
 import (
+	"github.com/hyperledger/fabric-chaincode-evm/fab3"
 	"github.com/hyperledger/fabric/integration/nwo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -36,6 +37,13 @@ type JsonRPCArrayResponse struct {
 	JsonRPC string       `json:"jsonrpc"`
 	ID      int          `json:"id"`
 	Result  []string     `json:"result,omitempty"`
+	Error   JsonRPCError `json:"error,omitempty"`
+}
+
+type JsonRPCLogArrayResponse struct {
+	JsonRPC string       `json:"jsonrpc"`
+	ID      int          `json:"id"`
+	Result  []fab3.Log   `json:"result,omitempty"`
 	Error   JsonRPCError `json:"error,omitempty"`
 }
 
