@@ -39,7 +39,7 @@ type LedgerClient interface {
 	QueryInfo(options ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 	QueryBlock(blockNumber uint64, options ...ledger.RequestOption) (*common.Block, error)
 	QueryBlockByTxID(txid fab.TransactionID, options ...ledger.RequestOption) (*common.Block, error)
-	QueryTransaction(txid fab.TransactionID, options ...ledger.RequestOption) (*peer.ProcessedTransaction, error)
+	//QueryBlockByHash(blockHash []byte, options ...ledger.RequestOption) (*common.Block, error)
 }
 
 // EthService is the rpc server implementation. Each function is an
@@ -60,6 +60,7 @@ type EthService interface {
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
+	GetLogs(*http.Request, *GetLogsArgs, *[]Log) error
 }
 
 type ethService struct {
@@ -70,6 +71,8 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 }
 
+// Incoming structs used as arguments
+
 type EthArgs struct {
 	To       string `json:"to"`
 	From     string `json:"from"`
@@ -79,6 +82,32 @@ type EthArgs struct {
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
 }
+
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock,omitempty"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	Address interface{} `json:"address,omitempty"` // string or array of strings.
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	Topics []string `json:"topics,omitempty"` // array of strings or array of array of strings
+	// Array of DATA, - (optional) Array of 32 Bytes DATA topics. Topics are
+	// order-dependent. Each topic can also be an array of DATA with "or"
+	// options.
+	Blockhash string `json:"blockhash,omitempty"`
+	// DATA, 32 Bytes (optional) restricts the logs returned to the single
+	// block with the 32-byte hash blockHash. Using blockHash is equivalent
+	// to fromBlock = toBlock = the block number with hash blockHash. If
+	// blockHash is present in the filter criteria, then neither fromBlock
+	// nor toBlock are allowed.
+}
+
+// structs being returned
 
 type TxReceipt struct {
 	TransactionHash   string `json:"transactionHash"`
@@ -457,8 +486,70 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
-func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
+/* GetLogs
 
+try to get all local calculations done before we make any calls to remote system
+
+*/
+func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) error {
+	s.logger.Debug(args)
+
+	if (args.FromBlock != "" || args.ToBlock != "") && args.Blockhash != "" {
+		return fmt.Errorf("Blockhash cannot be set at the same time as From or To; blockhash %q, From %q, To %q", args.Blockhash, args.FromBlock, args.ToBlock)
+	}
+	// check for earliest
+	if args.FromBlock == "earliest" || args.ToBlock == "earliest" {
+		return fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
+	}
+	// set defaults *after* checking for input conflicts and validating
+	if args.FromBlock == "" {
+		args.FromBlock = "latest"
+	}
+	if args.ToBlock == "" {
+		args.ToBlock = "latest"
+	}
+	// handle the address(es)
+	// args.Address
+
+	// handle the topics parsing
+	// args.Topics
+
+	/* if blockhash is set, this is a single block being parsed
+
+		 TODO prep blockhash for sending to fabric
+
+	         or do a query lookup of what blockNumber it is, and then a common case
+	         of handleBlock, same as below.  */
+	if args.Blockhash != "" {
+		// block, err := s.ledgerClient.QueryBlockByHash(args.Blockhash)
+		// if err != nil {
+		// 	return fmt.Errorf("Failed to query the ledger: %v", err)
+		// }
+		// TODO handle the block
+		return nil
+	}
+
+	from, err := s.parseBlockNum(strip0x(args.FromBlock))
+	if err != nil {
+		return err
+	}
+	to, err := s.parseBlockNum(strip0x(args.ToBlock))
+	if err != nil {
+		return err
+	}
+	if from > to {
+		return fmt.Errorf("first block number greater than last block number")
+	}
+
+	// possibly multiple blocks in a range
+	// TODO start handling each individual block in a loop
+	for blockNumber := from; blockNumber <= to; blockNumber++ {
+		// TODO handle the block
+	}
+	return nil
+}
+
+func (s *ethService) query(ccid, function string, queryArgs [][]byte) (channel.Response, error) {
 	return s.channelClient.Query(channel.Request{
 		ChaincodeID: ccid,
 		Fcn:         function,
@@ -490,7 +581,6 @@ func (s *ethService) parseBlockNum(input string) (uint64, error) {
 	case "pending":
 		return 0, fmt.Errorf("Unimplemented: fabric does not have the concept of in-progress blocks being visible.")
 	default:
-
 		return strconv.ParseUint(input, 16, 64)
 	}
 }

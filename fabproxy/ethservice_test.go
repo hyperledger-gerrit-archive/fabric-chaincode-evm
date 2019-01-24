@@ -40,7 +40,7 @@ var _ = Describe("Ethservice", func() {
 		mockLedgerClient *fabproxy_mocks.MockLedgerClient
 		channelID        string
 	)
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewDevelopment()
 	logger := rawLogger.Sugar()
 
 	BeforeEach(func() {
@@ -1049,6 +1049,29 @@ var _ = Describe("Ethservice", func() {
 					BlockNumber:      "0x1f",
 				}))
 			})
+		})
+	})
+	FDescribe("GetLogs", func() {
+		var logsArgs *fabproxy.GetLogsArgs
+		var reply *[]fabproxy.Log
+		BeforeEach(func() {
+			logsArgs = &fabproxy.GetLogsArgs{}
+			reply = nil
+		})
+		XIt("accepts an empty input struct by defaulting", func() {
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("0 & 0, fast path", func() {
+			logsArgs = &fabproxy.GetLogsArgs{FromBlock: "0x00", ToBlock: "0x0"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("blockhash", func() {
+			logsArgs = &fabproxy.GetLogsArgs{Blockhash: "0x1234"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+		})
+		It("kicks back an error when to or from is specified with blockhash", func() {
+			logsArgs = &fabproxy.GetLogsArgs{FromBlock: "0x00", Blockhash: "0x1234"}
+			Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).ShouldNot(Succeed())
 		})
 	})
 })
