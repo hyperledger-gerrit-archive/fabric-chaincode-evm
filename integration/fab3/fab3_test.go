@@ -223,6 +223,92 @@ var _ = Describe("Fab3", func() {
 		Expect(respBody.Error).To(BeZero())
 		Expect(respBody.Result).To(Equal(receipt.BlockNumber))
 		checkHexEncoded(respBody.Result)
+
+		By("querying for logs of a contract with no logs, we get no logs")
+		resp, err = sendRPCRequest(client, "eth_GetLogs", proxyAddress, 20, []interface{}{})
+		Expect(err).ToNot(HaveOccurred())
+		rBody, err = ioutil.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
+		err = json.Unmarshal(rBody, &respArrayBody)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(respArrayBody.Result).To(HaveLen(0))
+
+	})
+	It("implements the ethereum json rpc api with logs", func() {
+		By("Deploying the Simple Storage With Logs Contract")
+		params := helpers.MessageParams{
+			To:   "0000000000000000000000000000000000000000",
+			Data: helpers.SimpleStorageWithLog().CompiledBytecode,
+		}
+
+		resp, err := sendRPCRequest(client, "eth_sendTransaction", proxyAddress, 6, params)
+		Expect(err).ToNot(HaveOccurred())
+
+		//expectedBody := helpers.JsonRPCResponse{JsonRPC: "2.0", ID: 6}
+		rBody, err := ioutil.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
+
+		var respBody helpers.JsonRPCResponse
+		err = json.Unmarshal(rBody, &respBody)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(respBody.Error).To(BeZero())
+		txHash := respBody.Result
+
+		// It takes a couple seconds for the transaction to be found
+		var rpcResp helpers.JsonRPCTxReceipt
+		Eventually(func() helpers.JsonRPCError {
+			resp, err = sendRPCRequest(client, "eth_getTransactionReceipt", proxyAddress, 16, []string{txHash})
+			Expect(err).ToNot(HaveOccurred())
+
+			rBody, err = ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = json.Unmarshal(rBody, &rpcResp)
+			Expect(err).ToNot(HaveOccurred())
+			return rpcResp.Error
+		}, LongEventualTimeout, LongPollingInterval).Should(BeZero())
+		receipt := rpcResp.Result
+		contractAddr := receipt.ContractAddress
+		By("interacting with the contract")
+		val := "000000000000000000000000000000000000000000000000000000000000002a"
+		params = helpers.MessageParams{
+			To:   contractAddr,
+			Data: helpers.SimpleStorageWithLog().FunctionHashes["set"] + val,
+		}
+		resp, err = sendRPCRequest(client, "eth_sendTransaction", proxyAddress, 18, params)
+		rBody, err = ioutil.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
+
+		err = json.Unmarshal(rBody, &respBody)
+		Expect(err).ToNot(HaveOccurred())
+
+		Expect(respBody.Error).To(BeZero())
+		txHash = respBody.Result
+
+		// It takes a couple seconds for the transaction to be found
+		Eventually(func() helpers.JsonRPCError {
+			resp, err = sendRPCRequest(client, "eth_getTransactionReceipt", proxyAddress, 16, []string{txHash})
+			Expect(err).ToNot(HaveOccurred())
+
+			rBody, err = ioutil.ReadAll(resp.Body)
+			Expect(err).ToNot(HaveOccurred())
+
+			err = json.Unmarshal(rBody, &rpcResp)
+			Expect(err).ToNot(HaveOccurred())
+			return rpcResp.Error
+		}, LongEventualTimeout, LongPollingInterval).Should(BeZero())
+
+		By("querying for logs of a contract with logs, we get a log")
+		resp, err = sendRPCRequest(client, "eth_GetLogs", proxyAddress, 20, []interface{}{})
+		Expect(err).ToNot(HaveOccurred())
+		rBody, err = ioutil.ReadAll(resp.Body)
+		Expect(err).ToNot(HaveOccurred())
+		logf(string(rBody))
+		var respArrayBody helpers.JsonRPCLogArrayResponse
+		err = json.Unmarshal(rBody, &respArrayBody)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(respArrayBody.Result).To(HaveLen(1))
 	})
 
 	It("shuts down gracefully when it receives an Interrupt signal", func() {
@@ -239,6 +325,10 @@ var _ = Describe("Fab3", func() {
 		Eventually(proxyRunner.Err()).Should(gbytes.Say("Fab3 has exited"))
 	})
 })
+
+func logf(args ...interface{}) (int, error) {
+	return fmt.Fprintln(GinkgoWriter, args...)
+}
 
 func checkHexEncoded(value string) {
 	// Check to see that the result is a hexadecimal string
