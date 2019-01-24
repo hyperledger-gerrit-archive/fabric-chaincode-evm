@@ -61,6 +61,7 @@ type EthService interface {
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
+	GetLogs(*http.Request, *GetLogsArgs, *[]Log) error
 }
 
 type ethService struct {
@@ -71,6 +72,8 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 }
 
+// Incoming structs used as arguments
+
 type EthArgs struct {
 	To       string `json:"to"`
 	From     string `json:"from"`
@@ -80,6 +83,32 @@ type EthArgs struct {
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
 }
+
+type GetLogsArgs struct {
+	FromBlock string `json:"fromBlock"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	ToBlock string `json:"toBlock"`
+	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
+	// "latest" for the last mined block or "pending", "earliest" for not
+	// yet mined transactions.
+	Address string `json:"address"`
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	Topics string `json:"topics"`
+	// Array of DATA, - (optional) Array of 32 Bytes DATA topics. Topics are
+	// order-dependent. Each topic can also be an array of DATA with "or"
+	// options.
+	Blockhash string `json:"blockhash"`
+	// DATA, 32 Bytes (optional) restricts the logs returned to the single
+	// block with the 32-byte hash blockHash. Using blockHash is equivalent
+	// to fromBlock = toBlock = the block number with hash blockHash. If
+	// blockHash is present in the filter criteria, then neither fromBlock
+	// nor toBlock are allowed.
+}
+
+// structs being returned
 
 type TxReceipt struct {
 	TransactionHash   string `json:"transactionHash"`
@@ -455,6 +484,10 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	}
 
 	*reply = txn
+	return nil
+}
+
+func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) error {
 	return nil
 }
 
