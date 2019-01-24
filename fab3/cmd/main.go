@@ -35,7 +35,7 @@ const usage = `Fab3 uses environment variables to be able to start communicating
 var logger *zap.SugaredLogger
 
 func main() {
-	rawLogger, _ := zap.NewProduction()
+	rawLogger, _ := zap.NewDevelopment()
 	logger = rawLogger.Named("fab3").Sugar()
 
 	cfg := grabEnvVar("FAB3_CONFIG", true)
