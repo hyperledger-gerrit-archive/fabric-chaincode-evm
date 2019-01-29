@@ -59,6 +59,7 @@ type EthService interface {
 	EstimateGas(r *http.Request, args *EthArgs, reply *string) error
 	GetBalance(r *http.Request, p *[]string, reply *string) error
 	GetBlockByNumber(r *http.Request, p *[]interface{}, reply *Block) error
+	BlockNumber(r *http.Request, _ *interface{}, reply *string) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *Transaction) error
 }
 
@@ -400,6 +401,16 @@ func (s *ethService) GetBlockByNumber(r *http.Request, p *[]interface{}, reply *
 	s.logger.Debug("asked for block", number, "found block", blk)
 
 	*reply = blk
+	return nil
+}
+
+func (s *ethService) BlockNumber(r *http.Request, _ *interface{}, reply *string) error {
+	blockNumber, err := s.parseBlockNum("latest")
+	if err != nil {
+		return err
+	}
+	*reply = "0x" + strconv.FormatUint(uint64(blockNumber), 16)
+
 	return nil
 }
 
