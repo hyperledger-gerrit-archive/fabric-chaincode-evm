@@ -91,16 +91,53 @@ type EthArgs struct {
 	Nonce    string `json:"nonce"`
 }
 
-// consider implementing json.unmarshal and using custom types for address and topics
 type GetLogsArgs struct {
-	FromBlock string `json:"fromBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
-	ToBlock string `json:"toBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
+	FromBlock string
+	ToBlock   string
+	Address   addressFilter
+}
+
+func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
+	type inputGetLogsArgs struct {
+		FromBlock string      `json:"fromBlock"`
+		ToBlock   string      `json:"toBlock"`
+		Address   interface{} `json:"address"` // string or array of strings.
+	}
+	var input inputGetLogsArgs
+	if err := json.Unmarshal(data, &input); err != nil {
+		return err
+	}
+	gla.FromBlock = input.FromBlock
+	gla.ToBlock = input.ToBlock
+
+	var af addressFilter
+	// handle the address(es)
+	// s.logger.Debug("addresses", input.Address)
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	if singleAddress, ok := input.Address.(string); ok {
+		a, err := NewAddressFilter(singleAddress)
+		if err != nil {
+			return err
+		}
+		af = append(af, a...)
+	} else if multipleAddresses, ok := input.Address.([]interface{}); ok {
+		for _, address := range multipleAddresses {
+			if singleAddress, ok := address.(string); ok {
+				a, err := NewAddressFilter(singleAddress)
+				if err != nil {
+					return err
+				}
+				af = append(af, a...)
+			}
+		}
+	} else {
+		return fmt.Errorf("badly formatted address field")
+	}
+
+	gla.Address = af
+
+	return nil
 }
 
 // structs being returned
@@ -497,7 +534,15 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 		args.ToBlock = "latest"
 	}
 
+	// function to create filter object from addresses and topics?
+	var af addressFilter
+	af = args.Address
+
 	var from, to uint64
+
+	// maybe check if both from and to are 'latest' to avoid doing a query
+	// twice and coming out with different answers each time, which doesn't
+	// hurt, but is weird.
 	from, err := s.parseBlockNum(strip0x(args.FromBlock))
 	if err != nil {
 		return err
@@ -562,6 +607,23 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 				s.logger.Debug("checking events", eventMsgs)
 
 				for i, logEvent := range eventMsgs {
+					s.logger.Debug("checking event", i, logEvent)
+					if len(af) > 0 {
+						s.logger.Debug("checking event for matching address")
+						foundMatch := false
+						for _, address := range af { // if no address, empty range, skipped
+							s.logger.Debug("matching address", "matcherAddress", address, "eventAddress", logEvent.Address)
+							if logEvent.Address == address {
+								foundMatch = true
+								break
+							}
+						}
+						if foundMatch == false {
+							continue // no match, move to next logEvent
+						}
+					}
+
+					// everything matches, construct the log to return
 					topics := []string{}
 					for _, topic := range logEvent.Topics {
 						// each topic is a hexencoded word256
