@@ -1,0 +1,8 @@
+Code-Review+2: Morgan Bauer <mbauer@us.ibm.com>
+Code-Review+2: Jay Guo <guojiannan1101@gmail.com>
+Verified+1: Hyperledger Jobbuilder <jobbuilder@jenkins.hyperledger.org>
+Submitted-by: Morgan Bauer <mbauer@us.ibm.com>
+Submitted-at: Fri, 01 Feb 2019 20:28:44 +0000
+Reviewed-on: https://gerrit.hyperledger.org/r/28905
+Project: fabric-chaincode-evm
+Branch: refs/heads/master
