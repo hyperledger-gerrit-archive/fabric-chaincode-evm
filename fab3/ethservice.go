@@ -93,16 +93,53 @@ type EthArgs struct {
 	Nonce    string `json:"nonce"`
 }
 
-// consider implementing json.unmarshal and using custom types for address and topics
 type GetLogsArgs struct {
-	FromBlock string `json:"fromBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
-	ToBlock string `json:"toBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
+	FromBlock string
+	ToBlock   string
+	Address   addressFilter
+}
+
+func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
+	type inputGetLogsArgs struct {
+		FromBlock string      `json:"fromBlock"`
+		ToBlock   string      `json:"toBlock"`
+		Address   interface{} `json:"address"` // string or array of strings.
+	}
+	var input inputGetLogsArgs
+	if err := json.Unmarshal(data, &input); err != nil {
+		return err
+	}
+	gla.FromBlock = input.FromBlock
+	gla.ToBlock = input.ToBlock
+
+	var af addressFilter
+	// handle the address(es)
+	// zap.S().Debug("addresses", input.Address)
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	if singleAddress, ok := input.Address.(string); ok {
+		a, err := NewAddressFilter(singleAddress)
+		if err != nil {
+			return err
+		}
+		af = append(af, a...)
+	} else if multipleAddresses, ok := input.Address.([]interface{}); ok {
+		for _, address := range multipleAddresses {
+			if singleAddress, ok := address.(string); ok {
+				a, err := NewAddressFilter(singleAddress)
+				if err != nil {
+					return err
+				}
+				af = append(af, a...)
+			}
+		}
+	} else {
+		return fmt.Errorf("badly formatted address field")
+	}
+
+	gla.Address = af
+
+	return nil
 }
 
 // structs being returned
@@ -254,7 +291,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		}
 	}
 
-	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash)
+	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 	}
@@ -455,6 +492,21 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
+type addressFilter []string // 20 Byte Addresses
+
+// NewAddressFilter takes a string and checks that is the correct length to
+// represent a topic and strips the 0x
+func NewAddressFilter(s string) (addressFilter, error) {
+	if len(s) != HexEncodedAddressLegnth {
+		return nil, fmt.Errorf("address in wrong format, not 42 chars %q", s)
+	}
+	return addressFilter{strip0x(s)}, nil
+}
+
+const (
+	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
+)
+
 //GetLogs currently returns all logs in range FromBlock to ToBlock
 func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) error {
 	s.logger.Debug("GetLogs called")
@@ -472,7 +524,15 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 		args.ToBlock = "latest"
 	}
 
+	// function to create filter object from addresses and topics?
+	var af addressFilter
+	af = args.Address
+
 	var from, to uint64
+
+	// maybe check if both from and to are 'latest' to avoid doing a query
+	// twice and coming out with different answers each time, which doesn't
+	// hurt, but is weird.
 	from, err := s.parseBlockNum(strip0x(args.FromBlock))
 	if err != nil {
 		return err
@@ -530,7 +590,7 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 
 			blkNumber := "0x" + strconv.FormatUint(blockNumber, 16)
 
-			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, "rast", blockHash)
+			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, "rast", blockHash, af)
 			if err != nil {
 				return err
 			}
@@ -702,7 +762,7 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string) ([]Log, error) {
+func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string, af addressFilter) ([]Log, error) {
 	if events == nil {
 		return nil, nil
 	}
@@ -720,8 +780,23 @@ func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash
 	}
 
 	var txLogs []Log
-	txLogs = make([]Log, len(eventMsgs))
 	for i, logEvent := range eventMsgs {
+
+		zap.S().Debug("checking event for matching address")
+		if af != nil {
+			foundMatch := false
+			for _, address := range af { // if no address, empty range, skipped
+				zap.S().Debug("matching address", "matcherAddress", address, "eventAddress", logEvent.Address)
+				if logEvent.Address == address {
+					foundMatch = true
+					break
+				}
+			}
+			if !foundMatch {
+				continue // no match, move to next logEvent
+			}
+		}
+
 		topics := []string{}
 		for _, topic := range logEvent.Topics {
 			topics = append(topics, "0x"+topic)
@@ -740,7 +815,7 @@ func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash
 			logObj.Data = "0x" + logEvent.Data
 		}
 
-		txLogs[i] = logObj
+		txLogs = append(txLogs, logObj)
 	}
 	return txLogs, nil
 }
