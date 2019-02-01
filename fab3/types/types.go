@@ -11,6 +11,11 @@ fabric protobuf definitions.
 */
 package types
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 /*
 Input types used as arguments to ethservice methods.
 */
@@ -26,15 +31,72 @@ type EthArgs struct {
 }
 
 type GetLogsArgs struct {
-	FromBlock string `json:"fromBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
-	ToBlock string `json:"toBlock,omitempty"`
-	// QUANTITY|TAG - (optional, default: "latest") Integer block number, or
-	// "latest" for the last mined block or "pending", "earliest" for not
-	// yet mined transactions.
+	FromBlock string
+	ToBlock   string
+	Address   AddressFilter
 }
+
+func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
+	type inputGetLogsArgs struct {
+		FromBlock string      `json:"fromBlock"`
+		ToBlock   string      `json:"toBlock"`
+		Address   interface{} `json:"address"` // string or array of strings.
+	}
+	var input inputGetLogsArgs
+	if err := json.Unmarshal(data, &input); err != nil {
+		return err
+	}
+	gla.FromBlock = input.FromBlock
+	gla.ToBlock = input.ToBlock
+
+	var af AddressFilter
+	// handle the address(es)
+	// zap.S().Debug("addresses", input.Address)
+	// DATA|Array, 20 Bytes - (optional) Contract address or a list of
+	// addresses from which logs should originate.
+	if singleAddress, ok := input.Address.(string); ok {
+		a, err := NewAddressFilter(singleAddress)
+		if err != nil {
+			return err
+		}
+		af = append(af, a...)
+	} else if multipleAddresses, ok := input.Address.([]interface{}); ok {
+		for _, address := range multipleAddresses {
+			if singleAddress, ok := address.(string); ok {
+				a, err := NewAddressFilter(singleAddress)
+				if err != nil {
+					return err
+				}
+				af = append(af, a...)
+			}
+		}
+	} else {
+		return fmt.Errorf("badly formatted address field")
+	}
+
+	gla.Address = af
+
+	return nil
+}
+
+type AddressFilter []string // 20 Byte Addresses
+
+// NewAddressFilter takes a string and checks that is the correct length to
+// represent a topic and strips the 0x
+func NewAddressFilter(s string) (AddressFilter, error) {
+	if len(s) != HexEncodedAddressLegnth {
+		return nil, fmt.Errorf("address in wrong format, not 42 chars %q", s)
+	}
+	//Not checking for malformed addresses just stripping `0x` prefix where applicable
+	if len(s) > 2 && s[0:2] == "0x" {
+		s = s[2:]
+	}
+	return AddressFilter{s}, nil
+}
+
+const (
+	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
+)
 
 /*
 Output types used as return values from ethservice methods.
