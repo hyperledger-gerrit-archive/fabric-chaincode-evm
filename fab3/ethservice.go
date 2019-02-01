@@ -177,7 +177,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		}
 	}
 
-	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash)
+	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 	}
@@ -392,6 +392,10 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 	}
 
 	var from, to uint64
+
+	// maybe check if both from and to are 'latest' to avoid doing a query
+	// twice and coming out with different answers each time, which doesn't
+	// hurt, but is weird.
 	from, err := s.parseBlockNum(strip0x(args.FromBlock))
 	if err != nil {
 		return errors.Wrap(err, "failed to parse the block number")
@@ -454,7 +458,7 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 
 			blkNumber := "0x" + strconv.FormatUint(blockNumber, 16)
 			transactionIndexStr := "0x" + strconv.FormatUint(uint64(transactionIndex), 16)
-			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, transactionIndexStr, blockHash)
+			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, transactionIndexStr, blockHash, args.Address)
 			if err != nil {
 				return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 			}
@@ -609,7 +613,7 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string) ([]types.Log, error) {
+func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string, af types.AddressFilter) ([]types.Log, error) {
 	if len(events) == 0 {
 		return nil, nil
 	}
@@ -627,8 +631,22 @@ func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash
 	}
 
 	var txLogs []types.Log
-	txLogs = make([]types.Log, len(eventMsgs))
 	for i, logEvent := range eventMsgs {
+		if af != nil {
+			foundMatch := false
+			// if no address, empty range, skipped, present but empty address field results in no match
+			for _, address := range af {
+				zap.S().Debugw("trying address match", "matcherAddress", address, "eventAddress", logEvent.Address)
+				if logEvent.Address == address {
+					foundMatch = true
+					break
+				}
+			}
+			if !foundMatch {
+				continue // no match, move to next logEvent
+			}
+		}
+
 		var topics []string
 		for _, topic := range logEvent.Topics {
 			topics = append(topics, "0x"+topic)
@@ -647,7 +665,7 @@ func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash
 			log.Data = "0x" + logEvent.Data
 		}
 
-		txLogs[i] = log
+		txLogs = append(txLogs, log)
 	}
 	return txLogs, nil
 }
