@@ -97,7 +97,7 @@ type TxReceipt struct {
 type Log struct {
 	Address     string   `json:"address"`
 	Topics      []string `json:"topics"`
-	Data        string   `json:"data"`
+	Data        string   `json:"data,omitempty"`
 	BlockNumber string   `json:"blockNumber"`
 	TxHash      string   `json:"transactionHash"`
 	TxIndex     string   `json:"transactionIndex"`
@@ -228,41 +228,11 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		}
 	}
 
-	if respPayload.Events != nil {
-		chaincodeEvent, err := getChaincodeEvents(respPayload)
-		if err != nil {
-			return fmt.Errorf("Failed to decode chaincode event: %s", err)
-		}
-
-		var eventMsgs []event.Event
-		err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
-		if err != nil {
-			return fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
-		}
-
-		var txLogs []Log
-		txLogs = make([]Log, 0)
-		for i, logEvent := range eventMsgs {
-			topics := []string{}
-			for _, topic := range logEvent.Topics {
-				topics = append(topics, "0x"+topic)
-			}
-			logObj := Log{
-				Address:     "0x" + logEvent.Address,
-				Topics:      topics,
-				Data:        "0x" + logEvent.Data,
-				BlockNumber: receipt.BlockNumber,
-				TxHash:      receipt.TransactionHash,
-				TxIndex:     receipt.TransactionIndex,
-				BlockHash:   "0x" + hex.EncodeToString(blkHeader.GetDataHash()),
-				Index:       "0x" + strconv.FormatUint(uint64(i), 16),
-			}
-			txLogs = append(txLogs, logObj)
-		}
-		receipt.Logs = txLogs
-	} else {
-		receipt.Logs = nil
+	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash)
+	if err != nil {
+		return err
 	}
+	receipt.Logs = txLogs
 
 	*reply = receipt
 	return nil
@@ -620,9 +590,51 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func getChaincodeEvents(respPayload *peer.ChaincodeAction) (*peer.ChaincodeEvent, error) {
-	eBytes := respPayload.Events
+func getChaincodeEvents(eBytes []byte) (*peer.ChaincodeEvent, error) {
 	chaincodeEvent := &peer.ChaincodeEvent{}
 	err := proto.Unmarshal(eBytes, chaincodeEvent)
 	return chaincodeEvent, err
+}
+
+func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string) ([]Log, error) {
+	if events == nil {
+		return nil, nil
+	}
+
+	chaincodeEvent, err := getChaincodeEvents(events)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to decode chaincode event: %s", err)
+	}
+
+	var eventMsgs []event.Event
+	err = json.Unmarshal(chaincodeEvent.Payload, &eventMsgs)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to unmarshal chaincode event payload: %s", err)
+	}
+
+	var txLogs []Log
+	txLogs = make([]Log, len(eventMsgs))
+	for i, logEvent := range eventMsgs {
+		topics := []string{}
+		for _, topic := range logEvent.Topics {
+			topics = append(topics, "0x"+topic)
+		}
+		logObj := Log{
+			Address:     "0x" + logEvent.Address,
+			Topics:      topics,
+			Data:        "0x" + logEvent.Data,
+			BlockNumber: blocknumber,
+			TxHash:      txhash,
+			TxIndex:     txindex,
+			BlockHash:   blockhash,
+			Index:       "0x" + strconv.FormatUint(uint64(i), 16),
+		}
+
+		if logEvent.Data != "" {
+			logObj.Data = "0x" + logEvent.Data
+		}
+
+		txLogs[i] = logObj
+	}
+	return txLogs, nil
 }
