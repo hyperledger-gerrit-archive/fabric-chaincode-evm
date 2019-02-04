@@ -27,11 +27,6 @@ gotools-install: $(patsubst %,$(GOTOOLS_BINDIR)/%, $(GOTOOLS))
 gotools-clean:
 	-@rm -rf $(BUILD_DIR)/gotools
 
-#-----temporarty workaround for FAB-9667---
-gotool.golint:
-	@git clone https://github.com/golang/lint.git $(GOTOOLS_GOPATH)/src/golang.org/x/lint
-	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go install golang.org/x/lint/golint
-
 # Special override for ginkgo since we want to use the version vendored with the project
 gotool.ginkgo:
 	@echo "Building github.com/onsi/ginkgo/ginkgo -> ginkgo"
@@ -46,11 +41,14 @@ gotool.dep:
 	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go install -ldflags="-X main.version=$(DEP_VERSION) -X main.buildDate=$$(date '+%Y-%m-%d')" github.com/golang/dep/cmd/dep
 	@git -C $(abspath $(GOTOOLS_GOPATH))/src/github.com/golang/dep checkout -q master
 
+gotool.counterfeiter:
+	 go install ./vendor/github.com/maxbrunsfeld/counterfeiter
+
 # Default rule for gotools uses the name->path map for a generic 'go get' style build
 gotool.%:
 	$(eval TOOL = ${subst gotool.,,${@}})
 	@echo "Building ${go.fqp.${TOOL}} -> $(TOOL)"
-	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go get ${go.fqp.${TOOL}}
+	@GOPATH=$(abspath $(GOTOOLS_GOPATH)) GOBIN=$(abspath $(GOTOOLS_BINDIR)) go get -u ${go.fqp.${TOOL}}
 
 $(GOTOOLS_BINDIR)/%:
 	$(eval TOOL = ${subst $(GOTOOLS_BINDIR)/,,${@}})

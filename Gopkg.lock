@@ -493,6 +493,16 @@
   version = "v1.0.1"
 
 [[projects]]
+  name = "github.com/maxbrunsfeld/counterfeiter"
+  packages = [
+    ".",
+    "arguments",
+    "generator"
+  ]
+  revision = "2d74a219416bffff638e30a3775c76715f1968a7"
+  version = "v6.0.1"
+
+[[projects]]
   branch = "master"
   name = "github.com/miekg/pkcs11"
   packages = ["."]
@@ -851,6 +861,25 @@
   version = "v0.3.0"
 
 [[projects]]
+  branch = "master"
+  name = "golang.org/x/tools"
+  packages = [
+    "go/ast/astutil",
+    "go/gcexportdata",
+    "go/internal/cgo",
+    "go/internal/gcimporter",
+    "go/internal/packagesdriver",
+    "go/packages",
+    "go/types/typeutil",
+    "imports",
+    "internal/fastwalk",
+    "internal/gopathwalk",
+    "internal/module",
+    "internal/semver"
+  ]
+  revision = "d810ce9e47b0f3d0c3913072641989177aea2410"
+
+[[projects]]
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   revision = "df60624c1e9b9d2973e889c7a1cff73155da81c4"
@@ -897,6 +926,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "2f7b8fe61cf0aacc7da0b07520c988a28e8e373dae31d44acf8f7664de38b521"
+  inputs-digest = "c09b8e342b349c7ddfffd4fcf08ee2006eb167e9c12882aa4ba4cf2559f6c81b"
   solver-name = "gps-cdcl"
   solver-version = 1
