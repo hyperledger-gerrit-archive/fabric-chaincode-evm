@@ -97,12 +97,32 @@ type TxReceipt struct {
 type Log struct {
 	Address     string   `json:"address"`
 	Topics      []string `json:"topics"`
-	Data        string   `json:"data"`
+	Data        string   `json:"data,omitempty"`
 	BlockNumber string   `json:"blockNumber"`
 	TxHash      string   `json:"transactionHash"`
 	TxIndex     string   `json:"transactionIndex"`
 	BlockHash   string   `json:"blockHash"`
 	Index       string   `json:"logIndex"`
+}
+
+func NewLog(address, data, blocknumber, txhash, txindex string, blockhash []byte, index int, topics []string) Log {
+	var l Log
+	l.Address = "0x" + address
+	l.BlockNumber = blocknumber
+	l.TxHash = txhash
+	l.TxIndex = txindex
+	l.BlockHash = "0x" + hex.EncodeToString(blockhash)
+	l.Index = "0x" + strconv.FormatUint(uint64(index), 16)
+
+	if data != "" {
+		l.Data = "0x" + data
+	}
+
+	if len(topics) != 0 {
+		l.Topics = topics
+	}
+
+	return l
 }
 
 // Transaction represents an ethereum evm transaction.
@@ -247,16 +267,16 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 			for _, topic := range logEvent.Topics {
 				topics = append(topics, "0x"+topic)
 			}
-			logObj := Log{
-				Address:     "0x" + logEvent.Address,
-				Topics:      topics,
-				Data:        "0x" + logEvent.Data,
-				BlockNumber: receipt.BlockNumber,
-				TxHash:      receipt.TransactionHash,
-				TxIndex:     receipt.TransactionIndex,
-				BlockHash:   "0x" + hex.EncodeToString(blkHeader.GetDataHash()),
-				Index:       "0x" + strconv.FormatUint(uint64(i), 16),
-			}
+			logObj := NewLog(
+				logEvent.Address,
+				logEvent.Data,
+				receipt.BlockNumber,
+				receipt.TransactionHash,
+				receipt.TransactionIndex,
+				blkHeader.GetDataHash(),
+				i,
+				topics,
+			)
 			txLogs = append(txLogs, logObj)
 		}
 		receipt.Logs = txLogs
