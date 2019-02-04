@@ -1,6 +1,8 @@
 #Copyright IBM Corp. All Rights Reserved.
 #SPDX-License-Identifier: Apache-2.0
 
+required = ["github.com/maxbrunsfeld/counterfeiter"]
+
 [[constraint]]
   version = "0.23.3"
   name = "github.com/hyperledger/burrow"
@@ -16,6 +18,10 @@
 [[constraint]]
   version = "0.0.3"
   name = "github.com/spf13/cobra"
+
+[[constraint]]
+  name = "github.com/maxbrunsfeld/counterfeiter"
+  version = "v6.0.1"
 
 #Constraints from Fabric
 [[constraint]]
