@@ -102,6 +102,6 @@ bin/evmcc:
 	rm bin/evmcc # checking that it compiled, evmcc not meant to be run directly
 
 .PHONY:
-update-mocks:
+update-mocks: gotool.counterfeiter
 	go generate ./fab3/
 	counterfeiter -o mocks/evmcc/mockstub.go --fake-name MockStub vendor/github.com/hyperledger/fabric/core/chaincode/shim/interfaces.go ChaincodeStubInterface
