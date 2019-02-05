@@ -1072,6 +1072,22 @@ var _ = Describe("Ethservice", func() {
 			})
 		})
 	})
+	Describe("NewFilter & UninstallFilter", func() {
+		It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
+			var reply string
+			var x interface{}
+			By("Installing a filter")
+			Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
+			filterID, err := strconv.ParseUint(reply, 0, 16)
+			Expect(err).ToNot(HaveOccurred())
+			var valid bool
+			By("using the returned ID to uninstall a filter")
+			Expect(ethservice.UninstallFilter(&http.Request{}, &filterID, &valid)).ToNot(HaveOccurred())
+			Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+			Expect(ethservice.UninstallFilter(&http.Request{}, &filterID, &valid)).ToNot(HaveOccurred())
+			Expect(valid).To(BeFalse(), "the filter has just now been removed")
+		})
+	})
 })
 
 func GetSampleBlock(blockNumber uint64) *common.Block {

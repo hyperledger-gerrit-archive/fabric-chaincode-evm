@@ -126,6 +126,19 @@ type MockEthService struct {
 	getTransactionReceiptReturnsOnCall map[int]struct {
 		result1 error
 	}
+	NewFilterStub        func(*http.Request, *interface{}, *string) error
+	newFilterMutex       sync.RWMutex
+	newFilterArgsForCall []struct {
+		arg1 *http.Request
+		arg2 *interface{}
+		arg3 *string
+	}
+	newFilterReturns struct {
+		result1 error
+	}
+	newFilterReturnsOnCall map[int]struct {
+		result1 error
+	}
 	SendTransactionStub        func(*http.Request, *fab3.EthArgs, *string) error
 	sendTransactionMutex       sync.RWMutex
 	sendTransactionArgsForCall []struct {
@@ -137,6 +150,19 @@ type MockEthService struct {
 		result1 error
 	}
 	sendTransactionReturnsOnCall map[int]struct {
+		result1 error
+	}
+	UninstallFilterStub        func(*http.Request, *uint64, *bool) error
+	uninstallFilterMutex       sync.RWMutex
+	uninstallFilterArgsForCall []struct {
+		arg1 *http.Request
+		arg2 *uint64
+		arg3 *bool
+	}
+	uninstallFilterReturns struct {
+		result1 error
+	}
+	uninstallFilterReturnsOnCall map[int]struct {
 		result1 error
 	}
 	invocations      map[string][][]interface{}
@@ -169,12 +195,6 @@ func (fake *MockEthService) AccountsCallCount() int {
 	return len(fake.accountsArgsForCall)
 }
 
-func (fake *MockEthService) AccountsCalls(stub func(*http.Request, *string, *[]string) error) {
-	fake.accountsMutex.Lock()
-	defer fake.accountsMutex.Unlock()
-	fake.AccountsStub = stub
-}
-
 func (fake *MockEthService) AccountsArgsForCall(i int) (*http.Request, *string, *[]string) {
 	fake.accountsMutex.RLock()
 	defer fake.accountsMutex.RUnlock()
@@ -183,8 +203,6 @@ func (fake *MockEthService) AccountsArgsForCall(i int) (*http.Request, *string, 
 }
 
 func (fake *MockEthService) AccountsReturns(result1 error) {
-	fake.accountsMutex.Lock()
-	defer fake.accountsMutex.Unlock()
 	fake.AccountsStub = nil
 	fake.accountsReturns = struct {
 		result1 error
@@ -192,8 +210,6 @@ func (fake *MockEthService) AccountsReturns(result1 error) {
 }
 
 func (fake *MockEthService) AccountsReturnsOnCall(i int, result1 error) {
-	fake.accountsMutex.Lock()
-	defer fake.accountsMutex.Unlock()
 	fake.AccountsStub = nil
 	if fake.accountsReturnsOnCall == nil {
 		fake.accountsReturnsOnCall = make(map[int]struct {
@@ -231,12 +247,6 @@ func (fake *MockEthService) BlockNumberCallCount() int {
 	return len(fake.blockNumberArgsForCall)
 }
 
-func (fake *MockEthService) BlockNumberCalls(stub func(*http.Request, *interface{}, *string) error) {
-	fake.blockNumberMutex.Lock()
-	defer fake.blockNumberMutex.Unlock()
-	fake.BlockNumberStub = stub
-}
-
 func (fake *MockEthService) BlockNumberArgsForCall(i int) (*http.Request, *interface{}, *string) {
 	fake.blockNumberMutex.RLock()
 	defer fake.blockNumberMutex.RUnlock()
@@ -245,8 +255,6 @@ func (fake *MockEthService) BlockNumberArgsForCall(i int) (*http.Request, *inter
 }
 
 func (fake *MockEthService) BlockNumberReturns(result1 error) {
-	fake.blockNumberMutex.Lock()
-	defer fake.blockNumberMutex.Unlock()
 	fake.BlockNumberStub = nil
 	fake.blockNumberReturns = struct {
 		result1 error
@@ -254,8 +262,6 @@ func (fake *MockEthService) BlockNumberReturns(result1 error) {
 }
 
 func (fake *MockEthService) BlockNumberReturnsOnCall(i int, result1 error) {
-	fake.blockNumberMutex.Lock()
-	defer fake.blockNumberMutex.Unlock()
 	fake.BlockNumberStub = nil
 	if fake.blockNumberReturnsOnCall == nil {
 		fake.blockNumberReturnsOnCall = make(map[int]struct {
@@ -293,12 +299,6 @@ func (fake *MockEthService) CallCallCount() int {
 	return len(fake.callArgsForCall)
 }
 
-func (fake *MockEthService) CallCalls(stub func(*http.Request, *fab3.EthArgs, *string) error) {
-	fake.callMutex.Lock()
-	defer fake.callMutex.Unlock()
-	fake.CallStub = stub
-}
-
 func (fake *MockEthService) CallArgsForCall(i int) (*http.Request, *fab3.EthArgs, *string) {
 	fake.callMutex.RLock()
 	defer fake.callMutex.RUnlock()
@@ -307,8 +307,6 @@ func (fake *MockEthService) CallArgsForCall(i int) (*http.Request, *fab3.EthArgs
 }
 
 func (fake *MockEthService) CallReturns(result1 error) {
-	fake.callMutex.Lock()
-	defer fake.callMutex.Unlock()
 	fake.CallStub = nil
 	fake.callReturns = struct {
 		result1 error
@@ -316,8 +314,6 @@ func (fake *MockEthService) CallReturns(result1 error) {
 }
 
 func (fake *MockEthService) CallReturnsOnCall(i int, result1 error) {
-	fake.callMutex.Lock()
-	defer fake.callMutex.Unlock()
 	fake.CallStub = nil
 	if fake.callReturnsOnCall == nil {
 		fake.callReturnsOnCall = make(map[int]struct {
@@ -355,12 +351,6 @@ func (fake *MockEthService) EstimateGasCallCount() int {
 	return len(fake.estimateGasArgsForCall)
 }
 
-func (fake *MockEthService) EstimateGasCalls(stub func(*http.Request, *fab3.EthArgs, *string) error) {
-	fake.estimateGasMutex.Lock()
-	defer fake.estimateGasMutex.Unlock()
-	fake.EstimateGasStub = stub
-}
-
 func (fake *MockEthService) EstimateGasArgsForCall(i int) (*http.Request, *fab3.EthArgs, *string) {
 	fake.estimateGasMutex.RLock()
 	defer fake.estimateGasMutex.RUnlock()
@@ -369,8 +359,6 @@ func (fake *MockEthService) EstimateGasArgsForCall(i int) (*http.Request, *fab3.
 }
 
 func (fake *MockEthService) EstimateGasReturns(result1 error) {
-	fake.estimateGasMutex.Lock()
-	defer fake.estimateGasMutex.Unlock()
 	fake.EstimateGasStub = nil
 	fake.estimateGasReturns = struct {
 		result1 error
@@ -378,8 +366,6 @@ func (fake *MockEthService) EstimateGasReturns(result1 error) {
 }
 
 func (fake *MockEthService) EstimateGasReturnsOnCall(i int, result1 error) {
-	fake.estimateGasMutex.Lock()
-	defer fake.estimateGasMutex.Unlock()
 	fake.EstimateGasStub = nil
 	if fake.estimateGasReturnsOnCall == nil {
 		fake.estimateGasReturnsOnCall = make(map[int]struct {
@@ -417,12 +403,6 @@ func (fake *MockEthService) GetBalanceCallCount() int {
 	return len(fake.getBalanceArgsForCall)
 }
 
-func (fake *MockEthService) GetBalanceCalls(stub func(*http.Request, *[]string, *string) error) {
-	fake.getBalanceMutex.Lock()
-	defer fake.getBalanceMutex.Unlock()
-	fake.GetBalanceStub = stub
-}
-
 func (fake *MockEthService) GetBalanceArgsForCall(i int) (*http.Request, *[]string, *string) {
 	fake.getBalanceMutex.RLock()
 	defer fake.getBalanceMutex.RUnlock()
@@ -431,8 +411,6 @@ func (fake *MockEthService) GetBalanceArgsForCall(i int) (*http.Request, *[]stri
 }
 
 func (fake *MockEthService) GetBalanceReturns(result1 error) {
-	fake.getBalanceMutex.Lock()
-	defer fake.getBalanceMutex.Unlock()
 	fake.GetBalanceStub = nil
 	fake.getBalanceReturns = struct {
 		result1 error
@@ -440,8 +418,6 @@ func (fake *MockEthService) GetBalanceReturns(result1 error) {
 }
 
 func (fake *MockEthService) GetBalanceReturnsOnCall(i int, result1 error) {
-	fake.getBalanceMutex.Lock()
-	defer fake.getBalanceMutex.Unlock()
 	fake.GetBalanceStub = nil
 	if fake.getBalanceReturnsOnCall == nil {
 		fake.getBalanceReturnsOnCall = make(map[int]struct {
@@ -479,12 +455,6 @@ func (fake *MockEthService) GetBlockByNumberCallCount() int {
 	return len(fake.getBlockByNumberArgsForCall)
 }
 
-func (fake *MockEthService) GetBlockByNumberCalls(stub func(*http.Request, *[]interface{}, *fab3.Block) error) {
-	fake.getBlockByNumberMutex.Lock()
-	defer fake.getBlockByNumberMutex.Unlock()
-	fake.GetBlockByNumberStub = stub
-}
-
 func (fake *MockEthService) GetBlockByNumberArgsForCall(i int) (*http.Request, *[]interface{}, *fab3.Block) {
 	fake.getBlockByNumberMutex.RLock()
 	defer fake.getBlockByNumberMutex.RUnlock()
@@ -493,8 +463,6 @@ func (fake *MockEthService) GetBlockByNumberArgsForCall(i int) (*http.Request, *
 }
 
 func (fake *MockEthService) GetBlockByNumberReturns(result1 error) {
-	fake.getBlockByNumberMutex.Lock()
-	defer fake.getBlockByNumberMutex.Unlock()
 	fake.GetBlockByNumberStub = nil
 	fake.getBlockByNumberReturns = struct {
 		result1 error
@@ -502,8 +470,6 @@ func (fake *MockEthService) GetBlockByNumberReturns(result1 error) {
 }
 
 func (fake *MockEthService) GetBlockByNumberReturnsOnCall(i int, result1 error) {
-	fake.getBlockByNumberMutex.Lock()
-	defer fake.getBlockByNumberMutex.Unlock()
 	fake.GetBlockByNumberStub = nil
 	if fake.getBlockByNumberReturnsOnCall == nil {
 		fake.getBlockByNumberReturnsOnCall = make(map[int]struct {
@@ -541,12 +507,6 @@ func (fake *MockEthService) GetCodeCallCount() int {
 	return len(fake.getCodeArgsForCall)
 }
 
-func (fake *MockEthService) GetCodeCalls(stub func(*http.Request, *string, *string) error) {
-	fake.getCodeMutex.Lock()
-	defer fake.getCodeMutex.Unlock()
-	fake.GetCodeStub = stub
-}
-
 func (fake *MockEthService) GetCodeArgsForCall(i int) (*http.Request, *string, *string) {
 	fake.getCodeMutex.RLock()
 	defer fake.getCodeMutex.RUnlock()
@@ -555,8 +515,6 @@ func (fake *MockEthService) GetCodeArgsForCall(i int) (*http.Request, *string, *
 }
 
 func (fake *MockEthService) GetCodeReturns(result1 error) {
-	fake.getCodeMutex.Lock()
-	defer fake.getCodeMutex.Unlock()
 	fake.GetCodeStub = nil
 	fake.getCodeReturns = struct {
 		result1 error
@@ -564,8 +522,6 @@ func (fake *MockEthService) GetCodeReturns(result1 error) {
 }
 
 func (fake *MockEthService) GetCodeReturnsOnCall(i int, result1 error) {
-	fake.getCodeMutex.Lock()
-	defer fake.getCodeMutex.Unlock()
 	fake.GetCodeStub = nil
 	if fake.getCodeReturnsOnCall == nil {
 		fake.getCodeReturnsOnCall = make(map[int]struct {
@@ -603,12 +559,6 @@ func (fake *MockEthService) GetTransactionByHashCallCount() int {
 	return len(fake.getTransactionByHashArgsForCall)
 }
 
-func (fake *MockEthService) GetTransactionByHashCalls(stub func(*http.Request, *string, *fab3.Transaction) error) {
-	fake.getTransactionByHashMutex.Lock()
-	defer fake.getTransactionByHashMutex.Unlock()
-	fake.GetTransactionByHashStub = stub
-}
-
 func (fake *MockEthService) GetTransactionByHashArgsForCall(i int) (*http.Request, *string, *fab3.Transaction) {
 	fake.getTransactionByHashMutex.RLock()
 	defer fake.getTransactionByHashMutex.RUnlock()
@@ -617,8 +567,6 @@ func (fake *MockEthService) GetTransactionByHashArgsForCall(i int) (*http.Reques
 }
 
 func (fake *MockEthService) GetTransactionByHashReturns(result1 error) {
-	fake.getTransactionByHashMutex.Lock()
-	defer fake.getTransactionByHashMutex.Unlock()
 	fake.GetTransactionByHashStub = nil
 	fake.getTransactionByHashReturns = struct {
 		result1 error
@@ -626,8 +574,6 @@ func (fake *MockEthService) GetTransactionByHashReturns(result1 error) {
 }
 
 func (fake *MockEthService) GetTransactionByHashReturnsOnCall(i int, result1 error) {
-	fake.getTransactionByHashMutex.Lock()
-	defer fake.getTransactionByHashMutex.Unlock()
 	fake.GetTransactionByHashStub = nil
 	if fake.getTransactionByHashReturnsOnCall == nil {
 		fake.getTransactionByHashReturnsOnCall = make(map[int]struct {
@@ -665,12 +611,6 @@ func (fake *MockEthService) GetTransactionReceiptCallCount() int {
 	return len(fake.getTransactionReceiptArgsForCall)
 }
 
-func (fake *MockEthService) GetTransactionReceiptCalls(stub func(*http.Request, *string, *fab3.TxReceipt) error) {
-	fake.getTransactionReceiptMutex.Lock()
-	defer fake.getTransactionReceiptMutex.Unlock()
-	fake.GetTransactionReceiptStub = stub
-}
-
 func (fake *MockEthService) GetTransactionReceiptArgsForCall(i int) (*http.Request, *string, *fab3.TxReceipt) {
 	fake.getTransactionReceiptMutex.RLock()
 	defer fake.getTransactionReceiptMutex.RUnlock()
@@ -679,8 +619,6 @@ func (fake *MockEthService) GetTransactionReceiptArgsForCall(i int) (*http.Reque
 }
 
 func (fake *MockEthService) GetTransactionReceiptReturns(result1 error) {
-	fake.getTransactionReceiptMutex.Lock()
-	defer fake.getTransactionReceiptMutex.Unlock()
 	fake.GetTransactionReceiptStub = nil
 	fake.getTransactionReceiptReturns = struct {
 		result1 error
@@ -688,8 +626,6 @@ func (fake *MockEthService) GetTransactionReceiptReturns(result1 error) {
 }
 
 func (fake *MockEthService) GetTransactionReceiptReturnsOnCall(i int, result1 error) {
-	fake.getTransactionReceiptMutex.Lock()
-	defer fake.getTransactionReceiptMutex.Unlock()
 	fake.GetTransactionReceiptStub = nil
 	if fake.getTransactionReceiptReturnsOnCall == nil {
 		fake.getTransactionReceiptReturnsOnCall = make(map[int]struct {
@@ -697,6 +633,58 @@ func (fake *MockEthService) GetTransactionReceiptReturnsOnCall(i int, result1 er
 		})
 	}
 	fake.getTransactionReceiptReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) NewFilter(arg1 *http.Request, arg2 *interface{}, arg3 *string) error {
+	fake.newFilterMutex.Lock()
+	ret, specificReturn := fake.newFilterReturnsOnCall[len(fake.newFilterArgsForCall)]
+	fake.newFilterArgsForCall = append(fake.newFilterArgsForCall, struct {
+		arg1 *http.Request
+		arg2 *interface{}
+		arg3 *string
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("NewFilter", []interface{}{arg1, arg2, arg3})
+	fake.newFilterMutex.Unlock()
+	if fake.NewFilterStub != nil {
+		return fake.NewFilterStub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.newFilterReturns
+	return fakeReturns.result1
+}
+
+func (fake *MockEthService) NewFilterCallCount() int {
+	fake.newFilterMutex.RLock()
+	defer fake.newFilterMutex.RUnlock()
+	return len(fake.newFilterArgsForCall)
+}
+
+func (fake *MockEthService) NewFilterArgsForCall(i int) (*http.Request, *interface{}, *string) {
+	fake.newFilterMutex.RLock()
+	defer fake.newFilterMutex.RUnlock()
+	argsForCall := fake.newFilterArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *MockEthService) NewFilterReturns(result1 error) {
+	fake.NewFilterStub = nil
+	fake.newFilterReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) NewFilterReturnsOnCall(i int, result1 error) {
+	fake.NewFilterStub = nil
+	if fake.newFilterReturnsOnCall == nil {
+		fake.newFilterReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.newFilterReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -727,12 +715,6 @@ func (fake *MockEthService) SendTransactionCallCount() int {
 	return len(fake.sendTransactionArgsForCall)
 }
 
-func (fake *MockEthService) SendTransactionCalls(stub func(*http.Request, *fab3.EthArgs, *string) error) {
-	fake.sendTransactionMutex.Lock()
-	defer fake.sendTransactionMutex.Unlock()
-	fake.SendTransactionStub = stub
-}
-
 func (fake *MockEthService) SendTransactionArgsForCall(i int) (*http.Request, *fab3.EthArgs, *string) {
 	fake.sendTransactionMutex.RLock()
 	defer fake.sendTransactionMutex.RUnlock()
@@ -741,8 +723,6 @@ func (fake *MockEthService) SendTransactionArgsForCall(i int) (*http.Request, *f
 }
 
 func (fake *MockEthService) SendTransactionReturns(result1 error) {
-	fake.sendTransactionMutex.Lock()
-	defer fake.sendTransactionMutex.Unlock()
 	fake.SendTransactionStub = nil
 	fake.sendTransactionReturns = struct {
 		result1 error
@@ -750,8 +730,6 @@ func (fake *MockEthService) SendTransactionReturns(result1 error) {
 }
 
 func (fake *MockEthService) SendTransactionReturnsOnCall(i int, result1 error) {
-	fake.sendTransactionMutex.Lock()
-	defer fake.sendTransactionMutex.Unlock()
 	fake.SendTransactionStub = nil
 	if fake.sendTransactionReturnsOnCall == nil {
 		fake.sendTransactionReturnsOnCall = make(map[int]struct {
@@ -759,6 +737,58 @@ func (fake *MockEthService) SendTransactionReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.sendTransactionReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) UninstallFilter(arg1 *http.Request, arg2 *uint64, arg3 *bool) error {
+	fake.uninstallFilterMutex.Lock()
+	ret, specificReturn := fake.uninstallFilterReturnsOnCall[len(fake.uninstallFilterArgsForCall)]
+	fake.uninstallFilterArgsForCall = append(fake.uninstallFilterArgsForCall, struct {
+		arg1 *http.Request
+		arg2 *uint64
+		arg3 *bool
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("UninstallFilter", []interface{}{arg1, arg2, arg3})
+	fake.uninstallFilterMutex.Unlock()
+	if fake.UninstallFilterStub != nil {
+		return fake.UninstallFilterStub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.uninstallFilterReturns
+	return fakeReturns.result1
+}
+
+func (fake *MockEthService) UninstallFilterCallCount() int {
+	fake.uninstallFilterMutex.RLock()
+	defer fake.uninstallFilterMutex.RUnlock()
+	return len(fake.uninstallFilterArgsForCall)
+}
+
+func (fake *MockEthService) UninstallFilterArgsForCall(i int) (*http.Request, *uint64, *bool) {
+	fake.uninstallFilterMutex.RLock()
+	defer fake.uninstallFilterMutex.RUnlock()
+	argsForCall := fake.uninstallFilterArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *MockEthService) UninstallFilterReturns(result1 error) {
+	fake.UninstallFilterStub = nil
+	fake.uninstallFilterReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) UninstallFilterReturnsOnCall(i int, result1 error) {
+	fake.UninstallFilterStub = nil
+	if fake.uninstallFilterReturnsOnCall == nil {
+		fake.uninstallFilterReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.uninstallFilterReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -784,8 +814,12 @@ func (fake *MockEthService) Invocations() map[string][][]interface{} {
 	defer fake.getTransactionByHashMutex.RUnlock()
 	fake.getTransactionReceiptMutex.RLock()
 	defer fake.getTransactionReceiptMutex.RUnlock()
+	fake.newFilterMutex.RLock()
+	defer fake.newFilterMutex.RUnlock()
 	fake.sendTransactionMutex.RLock()
 	defer fake.sendTransactionMutex.RUnlock()
+	fake.uninstallFilterMutex.RLock()
+	defer fake.uninstallFilterMutex.RUnlock()
 	copiedInvocations := map[string][][]interface{}{}
 	for key, value := range fake.invocations {
 		copiedInvocations[key] = value
