@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
@@ -73,6 +74,8 @@ type EthService interface {
 	BlockNumber(r *http.Request, _ *interface{}, reply *string) error
 	GetTransactionByHash(r *http.Request, txID *string, reply *types.Transaction) error
 	GetLogs(*http.Request, *types.GetLogsArgs, *[]types.Log) error
+	NewFilter(*http.Request, *types.GetLogsArgs, *string) error
+	UninstallFilter(*http.Request, *uint64, *bool) error
 }
 
 type ethService struct {
@@ -81,10 +84,14 @@ type ethService struct {
 	channelID     string
 	ccid          string
 	logger        *zap.SugaredLogger
+	// should we use sync.Map?
+	filterMapLock sync.Mutex
+	filterMap     map[uint64]interface{}
+	filterSeq     uint64
 }
 
 func NewEthService(channelClient ChannelClient, ledgerClient LedgerClient, channelID string, ccid string, logger *zap.SugaredLogger) EthService {
-	return &ethService{channelClient: channelClient, ledgerClient: ledgerClient, channelID: channelID, ccid: ccid, logger: logger.Named("ethservice")}
+	return &ethService{channelClient: channelClient, ledgerClient: ledgerClient, channelID: channelID, ccid: ccid, logger: logger.Named("ethservice"), filterMap: make(map[uint64]interface{})}
 }
 
 func (s *ethService) GetCode(r *http.Request, arg *string, reply *string) error {
@@ -436,7 +443,6 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 			if err != nil {
 				return errors.Wrap(err, "failed to unmarshal the transaction")
 			}
-
 			// only process transactions
 			if chdr.Type != int32(common.HeaderType_ENDORSER_TRANSACTION) {
 				logger.Debug("skipping non-ENDORSER_TRANSACTION")
@@ -464,6 +470,30 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 
 	logger.Debug("returning logs", txLogs)
 	*logs = txLogs
+
+	return nil
+}
+
+func (s *ethService) NewFilter(_ *http.Request, filter *types.GetLogsArgs, result *string) error {
+	s.filterMapLock.Lock()
+	s.filterSeq++
+	index := s.filterSeq
+	s.filterMap[index] = filter
+	s.filterMapLock.Unlock()
+	*result = "0x" + strconv.FormatUint(index, 16)
+	return nil
+}
+
+func (s *ethService) UninstallFilter(_ *http.Request, filterID *uint64, removed *bool) error {
+	s.filterMapLock.Lock()
+
+	if _, ok := s.filterMap[*filterID]; ok {
+		delete(s.filterMap, *filterID)
+		*removed = true
+	} else {
+		*removed = false
+	}
+	s.filterMapLock.Unlock()
 
 	return nil
 }
