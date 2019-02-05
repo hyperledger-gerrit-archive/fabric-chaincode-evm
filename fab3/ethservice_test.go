@@ -1299,6 +1299,24 @@ var _ = Describe("Ethservice", func() {
 		})
 	})
 
+	Describe("NewFilter & UninstallFilter", func() {
+		It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
+			var reply string
+			var x types.GetLogsArgs
+			By("Installing a filter")
+			Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
+			_, err := strconv.ParseUint(reply, 0, 16)
+			Expect(err).ToNot(HaveOccurred())
+			var valid bool
+			By("using the returned ID to uninstall a filter")
+			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+			Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+			valid = false // reset to default value
+			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+			Expect(valid).To(BeFalse(), "the filter has just now been removed")
+		})
+	})
+
 	Describe("GetTransactionCount", func() {
 		It("always returns 0x0", func() {
 			var reply string
