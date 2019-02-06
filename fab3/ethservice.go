@@ -97,6 +97,7 @@ type GetLogsArgs struct {
 	FromBlock string
 	ToBlock   string
 	Address   addressFilter
+	Topics    topicsFilter
 }
 
 func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
@@ -104,6 +105,7 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 		FromBlock string      `json:"fromBlock"`
 		ToBlock   string      `json:"toBlock"`
 		Address   interface{} `json:"address"` // string or array of strings.
+		Topics    interface{} `json:"topics"`  // array of strings, or array of array of strings
 	}
 	var input inputGetLogsArgs
 	if err := json.Unmarshal(data, &input); err != nil {
@@ -138,6 +140,45 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 	}
 
 	gla.Address = af
+
+	var tf topicsFilter
+
+	// handle the topics parsing
+	// need to strip 0x prefix, as stored
+	zap.S().Debug("topics", input.Topics)
+	if topics, ok := input.Topics.([]interface{}); !ok {
+		return fmt.Errorf("topics must be slice")
+	} else {
+		for i, topic := range topics {
+			if singleTopic, ok := topic.(string); ok {
+				zap.S().Debug("single topic", "index", i)
+				f, err := NewTopicFilter(singleTopic)
+				if err != nil {
+					return err
+				}
+				tf = append(tf, f)
+			} else if multipleTopic, ok := topic.([]interface{}); ok {
+				zap.S().Debug("or'd topics", "index", i)
+				var mtf topicFilter
+				for _, singleTopic := range multipleTopic {
+					if stringTopic, ok := singleTopic.(string); ok {
+						f, err := NewTopicFilter(stringTopic)
+						if err != nil {
+							return err
+						}
+						mtf = append(mtf, f...)
+					} else {
+						return fmt.Errorf("all topics must be strings")
+					}
+				}
+				tf = append(tf, mtf)
+			} else {
+				return fmt.Errorf("some unparsable trash %q", topic)
+			}
+		}
+	}
+
+	gla.Topics = tf
 
 	return nil
 }
@@ -291,7 +332,7 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		}
 	}
 
-	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash, nil)
+	txLogs, err := fabricEventToEVMLogs(respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash, nil, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 	}
@@ -503,8 +544,30 @@ func NewAddressFilter(s string) (addressFilter, error) {
 	return addressFilter{strip0x(s)}, nil
 }
 
+type topicFilter []string // 32 Byte Topics
+
+// NewTopicFilter takes a string and checks that is the correct length to
+// represent a topic and strips the 0x
+func NewTopicFilter(s string) (topicFilter, error) {
+	if len(s) != HexEncodedTopicLegnth {
+		return nil, fmt.Errorf("topic in wrong format, %d chars not 66 chars %q", len(s), s)
+	}
+	return topicFilter{strip0x(s)}, nil
+}
+
+// slices are in order, but maybe we should name individual fields first,second,
+// etc.  only a few individual fields.
+//
+// TODO(mhb): maybe an alias for the contained type instead of a struct?
+type topicsFilter []topicFilter
+
+func NewTopicsFilter(tf ...topicFilter) topicsFilter {
+	return tf
+}
+
 const (
 	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
+	HexEncodedTopicLegnth   = 66 // 32 bytes, is 64 hex chars, plus two for '0x'
 )
 
 //GetLogs currently returns all logs in range FromBlock to ToBlock
@@ -527,6 +590,8 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 	// function to create filter object from addresses and topics?
 	var af addressFilter
 	af = args.Address
+	var tf topicsFilter
+	tf = args.Topics
 
 	var from, to uint64
 
@@ -591,7 +656,7 @@ func (s *ethService) GetLogs(r *http.Request, args *GetLogsArgs, logs *[]Log) er
 
 			blkNumber := "0x" + strconv.FormatUint(blockNumber, 16)
 			transactionIndexStr := "0x" + strconv.FormatUint(uint64(transactionIndex), 16)
-			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, transactionIndexStr, blockHash, af)
+			logs, err := fabricEventToEVMLogs(respPayload.Events, blkNumber, transactionHash, transactionIndexStr, blockHash, af, tf)
 			if err != nil {
 				return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 			}
@@ -763,7 +828,7 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string, af addressFilter) ([]Log, error) {
+func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash string, af addressFilter, tf topicsFilter) ([]Log, error) {
 	if events == nil {
 		return nil, nil
 	}
@@ -796,6 +861,35 @@ func fabricEventToEVMLogs(events []byte, blocknumber, txhash, txindex, blockhash
 			if !foundMatch {
 				continue // no match, move to next logEvent
 			}
+		}
+
+		zap.S().Debug("checking for topics")
+		allMatch := true // opposite is any not match
+		// check match for each topic,
+		for i, topicFilter := range tf {
+			// if filter is empty it matches automatically.
+			if len(topicFilter) == 0 {
+				continue
+			}
+
+			eventTopic := logEvent.Topics[i]
+			foundMatch := false
+			for _, topic := range topicFilter {
+				zap.S().Debug("matching Topic ", "matcherTopic", topic, "eventTopic", eventTopic)
+				if topic == eventTopic || topic == "" {
+					foundMatch = true
+					break
+				}
+			}
+			if foundMatch == false {
+				allMatch = false
+				// if we didn't find a match, no use in checking any of the other topics
+				break
+			}
+
+		}
+		if allMatch == false {
+			continue
 		}
 
 		topics := []string{}
