@@ -178,7 +178,8 @@ func (s *ethService) GetTransactionReceipt(r *http.Request, txID *string, reply 
 		}
 	}
 
-	txLogs, err := fabricEventToEVMLogs(logger, respPayload.Events, receipt.BlockNumber, receipt.TransactionHash, receipt.TransactionIndex, receipt.BlockHash, types.AddressFilter{})
+	txLogs, err := fabricEventToEVMLogs(logger, respPayload.Events, receipt.BlockNumber, receipt.TransactionHash,
+		receipt.TransactionIndex, receipt.BlockHash, types.AddressFilter{}, types.TopicsFilter{})
 	if err != nil {
 		return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 	}
@@ -454,7 +455,8 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 
 			blkNumber := "0x" + strconv.FormatUint(blockNumber, 16)
 			transactionIndexStr := "0x" + strconv.FormatUint(uint64(transactionIndex), 16)
-			logs, err := fabricEventToEVMLogs(logger, respPayload.Events, blkNumber, transactionHash, transactionIndexStr, blockHash, args.Address)
+			logs, err := fabricEventToEVMLogs(logger, respPayload.Events, blkNumber, transactionHash,
+				transactionIndexStr, blockHash, args.Address, args.Topics)
 			if err != nil {
 				return errors.Wrap(err, "failed to get EVM Logs out of fabric event")
 			}
@@ -609,7 +611,8 @@ func findTransaction(txID string, blockData [][]byte) (string, *common.Payload, 
 	return "", &common.Payload{}, nil
 }
 
-func fabricEventToEVMLogs(logger *zap.SugaredLogger, events []byte, blocknumber, txhash, txindex, blockhash string, af types.AddressFilter) ([]types.Log, error) {
+func fabricEventToEVMLogs(logger *zap.SugaredLogger, events []byte, blocknumber, txhash, txindex, blockhash string,
+	af types.AddressFilter, tf types.TopicsFilter) ([]types.Log, error) {
 	if len(events) == 0 {
 		return nil, nil
 	}
@@ -640,6 +643,37 @@ func fabricEventToEVMLogs(logger *zap.SugaredLogger, events []byte, blocknumber,
 			}
 			if !foundMatch {
 				continue // no match, move to next logEvent
+			}
+		}
+
+		if len(tf) != 0 {
+			logger.Debug("checking for topics")
+			allMatch := true // opposite is any not match
+			// check match for each topic,
+			for i, topicFilter := range tf {
+				// if filter is empty it matches automatically.
+				if len(topicFilter) == 0 {
+					continue
+				}
+
+				eventTopic := logEvent.Topics[i]
+				foundMatch := false
+				for _, topic := range topicFilter {
+					logger.Debugw("matching Topic ", "matcherTopic", topic, "eventTopic", eventTopic)
+					if topic == eventTopic || topic == "" {
+						foundMatch = true
+						break
+					}
+				}
+				if foundMatch == false {
+					allMatch = false
+					// if we didn't find a match, no use in checking any of the other topics
+					break
+				}
+
+			}
+			if allMatch == false {
+				continue
 			}
 		}
 
