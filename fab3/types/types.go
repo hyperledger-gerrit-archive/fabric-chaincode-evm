@@ -14,6 +14,8 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+
+	"go.uber.org/zap"
 )
 
 /*
@@ -34,6 +36,7 @@ type GetLogsArgs struct {
 	FromBlock string
 	ToBlock   string
 	Address   AddressFilter
+	Topics    TopicsFilter
 }
 
 func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
@@ -41,6 +44,7 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 		FromBlock string      `json:"fromBlock"`
 		ToBlock   string      `json:"toBlock"`
 		Address   interface{} `json:"address"` // string or array of strings.
+		Topics    interface{} `json:"topics"`  // array of strings, or array of array of strings
 	}
 	var input inputGetLogsArgs
 	if err := json.Unmarshal(data, &input); err != nil {
@@ -76,8 +80,52 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 
 	gla.Address = af
 
+	var tf TopicsFilter
+
+	// handle the topics parsing
+	// need to strip 0x prefix, as stored
+	zap.S().Debug("topics", input.Topics)
+	if topics, ok := input.Topics.([]interface{}); !ok {
+		return fmt.Errorf("topics must be slice")
+	} else {
+		for i, topic := range topics {
+			if singleTopic, ok := topic.(string); ok {
+				zap.S().Debug("single topic", "index", i)
+				f, err := NewTopicFilter(singleTopic)
+				if err != nil {
+					return err
+				}
+				tf = append(tf, f)
+			} else if multipleTopic, ok := topic.([]interface{}); ok {
+				zap.S().Debug("or'd topics", "index", i)
+				var mtf TopicFilter
+				for _, singleTopic := range multipleTopic {
+					if stringTopic, ok := singleTopic.(string); ok {
+						f, err := NewTopicFilter(stringTopic)
+						if err != nil {
+							return err
+						}
+						mtf = append(mtf, f...)
+					} else {
+						return fmt.Errorf("all topics must be strings")
+					}
+				}
+				tf = append(tf, mtf)
+			} else {
+				return fmt.Errorf("some unparsable trash %q", topic)
+			}
+		}
+	}
+
+	gla.Topics = tf
+
 	return nil
 }
+
+const (
+	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
+	HexEncodedTopicLegnth   = 66 // 32 bytes, is 64 hex chars, plus two for '0x'
+)
 
 type AddressFilter []string // 20 Byte Addresses
 
@@ -94,9 +142,30 @@ func NewAddressFilter(s string) (AddressFilter, error) {
 	return AddressFilter{s}, nil
 }
 
-const (
-	HexEncodedAddressLegnth = 42 // 20 bytes, is 40 hex chars, plus two for '0x'
-)
+type TopicFilter []string // 32 Byte Topics
+
+// NewTopicFilter takes a string and checks that is the correct length to
+// represent a topic and strips the 0x
+func NewTopicFilter(s string) (TopicFilter, error) {
+	if len(s) != HexEncodedTopicLegnth {
+		return nil, fmt.Errorf("topic in wrong format, %d chars not 66 chars %q", len(s), s)
+	}
+	//Not checking for malformed addresses just stripping `0x` prefix where applicable
+	if len(s) > 2 && s[0:2] == "0x" {
+		s = s[2:]
+	}
+	return TopicFilter{s}, nil
+}
+
+// slices are in order, but maybe we should name individual fields first,second,
+// etc.  only a few individual fields.
+//
+// TODO(mhb): maybe an alias for the contained type instead of a struct?
+type TopicsFilter []TopicFilter
+
+func NewTopicsFilter(tf ...TopicFilter) TopicsFilter {
+	return tf
+}
 
 /*
 Output types used as return values from ethservice methods.
