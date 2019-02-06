@@ -1191,10 +1191,43 @@ var _ = Describe("Ethservice", func() {
 					Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
 					Expect(len(*reply)).Should(Equal(2))
 				})
+				It("an array of multiple single topics", func() {
+					tf, err := fab3.NewTopicFilter("0x" + formatTopic("sample-topic-1"))
+					Expect(err).ShouldNot(HaveOccurred())
+					logsArgs = &fab3.GetLogsArgs{Topics: fab3.NewTopicsFilter(tf)}
+					Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+					Expect(len(*reply)).Should(Equal(1), "Only one of events should match")
+				})
+				It("an array of and'd topics", func() {
+					tf1, err := fab3.NewTopicFilter("0x" + formatTopic("sample-topic-1"))
+					Expect(err).ShouldNot(HaveOccurred())
+					tf2, err := fab3.NewTopicFilter("0x" + formatTopic("sample-topic-2"))
+					Expect(err).ShouldNot(HaveOccurred())
+					logsArgs = &fab3.GetLogsArgs{Topics: fab3.NewTopicsFilter(tf1, tf2)}
+					Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+					Expect(len(*reply)).Should(Equal(1), "Only one of events should match")
+				})
+				It("an array of multiple or'd topics", func() {
+					tf1, err := fab3.NewTopicFilter("0x" + formatTopic("sample-topic-1"))
+					Expect(err).ShouldNot(HaveOccurred())
+					tf2, err := fab3.NewTopicFilter("0x" + formatTopic("sample-topic-3"))
+					Expect(err).ShouldNot(HaveOccurred())
+					tf := append(tf1, tf2...)
+					logsArgs = &fab3.GetLogsArgs{Topics: fab3.NewTopicsFilter(tf)}
+					Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).Should(Succeed())
+					Expect(len(*reply)).Should(Equal(2), "Only one of events should match")
+				})
 			})
 		})
 	})
 })
+
+func formatTopic(s string) string {
+	if len(s) > 64 {
+		s = s[:64]
+	}
+	return fmt.Sprintf("%64v", s)
+}
 
 func GetSampleBlock(blockNumber uint64) *common.Block {
 	addr, err := crypto.AddressFromBytes([]byte("82373458164820947891"))
@@ -1202,7 +1235,7 @@ func GetSampleBlock(blockNumber uint64) *common.Block {
 
 	msg := event.Event{
 		Address: strings.ToLower(addr.String()),
-		Topics:  []string{"sample-topic-1", "sample-topic2"},
+		Topics:  []string{formatTopic("sample-topic-1"), formatTopic("sample-topic-2")},
 		Data:    "sample-data",
 	}
 	events := []event.Event{msg}
@@ -1224,7 +1257,7 @@ func GetSampleBlock(blockNumber uint64) *common.Block {
 
 	msg = event.Event{
 		Address: strings.ToLower(addr.String()),
-		Topics:  []string{"sample-topic-1", "sample-topic2"},
+		Topics:  []string{formatTopic("sample-topic-3"), formatTopic("sample-topic-4")},
 		Data:    "sample-data",
 	}
 	events = []event.Event{msg}
