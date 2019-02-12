@@ -12,6 +12,7 @@ import (
 
 	"github.com/hyperledger/fabric-chaincode-evm/fab3"
 
+	. "github.com/hyperledger/fabric-chaincode-evm/fab3/types"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
@@ -35,12 +36,12 @@ var _ = Describe("ethereum json rpc struct fields", func() {
 			fieldNames := []string{"transactionHash", "transactionIndex",
 				"blockHash", "blockNumber", "contractAddress", "gasUsed",
 				"cumulativeGasUsed", "to", "status", "logs"}
-			assertTypeMarshalsJSONFields(fieldNames, fab3.TxReceipt{})
+			assertTypeMarshalsJSONFields(fieldNames, TxReceipt{})
 		})
 		It("for Log subobjects in TxReceipt with the proper cases", func() {
 			fieldNames := []string{"address", "topics", "data", "blockNumber",
 				"transactionHash", "transactionIndex", "blockHash", "logIndex"}
-			assertTypeMarshalsJSONFields(fieldNames, fab3.Log{})
+			assertTypeMarshalsJSONFields(fieldNames, Log{})
 		})
 		It("for Transaction with the proper cases", func() {
 			fieldNames := []string{"blockHash", "blockNumber", "to", "input", "transactionIndex", "hash"}
