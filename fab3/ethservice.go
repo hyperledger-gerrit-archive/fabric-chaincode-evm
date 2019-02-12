@@ -18,12 +18,14 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"go.uber.org/zap"
 
-	"github.com/hyperledger/fabric-chaincode-evm/event"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
 	"github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 	"github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/peer"
+
+	"github.com/hyperledger/fabric-chaincode-evm/event"
+	. "github.com/hyperledger/fabric-chaincode-evm/fab3/types"
 )
 
 var ZeroAddress = make([]byte, 20)
@@ -79,30 +81,6 @@ type EthArgs struct {
 	Value    string `json:"value"`
 	Data     string `json:"data"`
 	Nonce    string `json:"nonce"`
-}
-
-type TxReceipt struct {
-	TransactionHash   string `json:"transactionHash"`
-	TransactionIndex  string `json:"transactionIndex"`
-	BlockHash         string `json:"blockHash"`
-	BlockNumber       string `json:"blockNumber"`
-	ContractAddress   string `json:"contractAddress"`
-	GasUsed           int    `json:"gasUsed"`
-	CumulativeGasUsed int    `json:"cumulativeGasUsed"`
-	To                string `json:"to"`
-	Logs              []Log  `json:"logs"`
-	Status            string `json:"status"`
-}
-
-type Log struct {
-	Address     string   `json:"address"`
-	Topics      []string `json:"topics"`
-	Data        string   `json:"data"`
-	BlockNumber string   `json:"blockNumber"`
-	TxHash      string   `json:"transactionHash"`
-	TxIndex     string   `json:"transactionIndex"`
-	BlockHash   string   `json:"blockHash"`
-	Index       string   `json:"logIndex"`
 }
 
 // Transaction represents an ethereum evm transaction.

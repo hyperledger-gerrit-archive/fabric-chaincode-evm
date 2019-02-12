@@ -2,10 +2,11 @@
 package fab3
 
 import (
-	http "net/http"
-	sync "sync"
+	"net/http"
+	"sync"
 
-	fab3 "github.com/hyperledger/fabric-chaincode-evm/fab3"
+	"github.com/hyperledger/fabric-chaincode-evm/fab3"
+	"github.com/hyperledger/fabric-chaincode-evm/fab3/types"
 )
 
 type MockEthService struct {
@@ -113,12 +114,12 @@ type MockEthService struct {
 	getTransactionByHashReturnsOnCall map[int]struct {
 		result1 error
 	}
-	GetTransactionReceiptStub        func(*http.Request, *string, *fab3.TxReceipt) error
+	GetTransactionReceiptStub        func(*http.Request, *string, *types.TxReceipt) error
 	getTransactionReceiptMutex       sync.RWMutex
 	getTransactionReceiptArgsForCall []struct {
 		arg1 *http.Request
 		arg2 *string
-		arg3 *fab3.TxReceipt
+		arg3 *types.TxReceipt
 	}
 	getTransactionReceiptReturns struct {
 		result1 error
@@ -639,13 +640,13 @@ func (fake *MockEthService) GetTransactionByHashReturnsOnCall(i int, result1 err
 	}{result1}
 }
 
-func (fake *MockEthService) GetTransactionReceipt(arg1 *http.Request, arg2 *string, arg3 *fab3.TxReceipt) error {
+func (fake *MockEthService) GetTransactionReceipt(arg1 *http.Request, arg2 *string, arg3 *types.TxReceipt) error {
 	fake.getTransactionReceiptMutex.Lock()
 	ret, specificReturn := fake.getTransactionReceiptReturnsOnCall[len(fake.getTransactionReceiptArgsForCall)]
 	fake.getTransactionReceiptArgsForCall = append(fake.getTransactionReceiptArgsForCall, struct {
 		arg1 *http.Request
 		arg2 *string
-		arg3 *fab3.TxReceipt
+		arg3 *types.TxReceipt
 	}{arg1, arg2, arg3})
 	fake.recordInvocation("GetTransactionReceipt", []interface{}{arg1, arg2, arg3})
 	fake.getTransactionReceiptMutex.Unlock()
@@ -665,13 +666,13 @@ func (fake *MockEthService) GetTransactionReceiptCallCount() int {
 	return len(fake.getTransactionReceiptArgsForCall)
 }
 
-func (fake *MockEthService) GetTransactionReceiptCalls(stub func(*http.Request, *string, *fab3.TxReceipt) error) {
+func (fake *MockEthService) GetTransactionReceiptCalls(stub func(*http.Request, *string, *types.TxReceipt) error) {
 	fake.getTransactionReceiptMutex.Lock()
 	defer fake.getTransactionReceiptMutex.Unlock()
 	fake.GetTransactionReceiptStub = stub
 }
 
-func (fake *MockEthService) GetTransactionReceiptArgsForCall(i int) (*http.Request, *string, *fab3.TxReceipt) {
+func (fake *MockEthService) GetTransactionReceiptArgsForCall(i int) (*http.Request, *string, *types.TxReceipt) {
 	fake.getTransactionReceiptMutex.RLock()
 	defer fake.getTransactionReceiptMutex.RUnlock()
 	argsForCall := fake.getTransactionReceiptArgsForCall[i]
