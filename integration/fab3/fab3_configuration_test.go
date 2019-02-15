@@ -49,7 +49,7 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("Starting Fab3 on port"))
+		Eventually(output).Should(gbytes.Say("starting-fab3"))
 	})
 
 	It("can be configured with flags", func() {
@@ -69,7 +69,7 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("Starting Fab3 on port %d", proxyPort))
+		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":%d", proxyPort))
 	})
 
 	It("will use flag values over environment variables ", func() {
@@ -95,7 +95,7 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("Starting Fab3 on port %d", proxyPort))
+		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":%d", proxyPort))
 	})
 
 	It("requires config to be set", func() {
@@ -202,6 +202,6 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("Starting Fab3 on port 5000"))
+		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":5000"))
 	})
 })
