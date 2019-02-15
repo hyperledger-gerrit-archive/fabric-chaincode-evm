@@ -39,7 +39,7 @@ checks: basic-checks unit-test
 basic-checks: license spelling linter build
 
 .PHONY: spelling
-spelling:
+spelling: gotool.misspell
 	@scripts/check_spelling.sh
 
 .PHONY: license
@@ -64,11 +64,11 @@ unit-test: $(PROJECT_FILES) gotool.ginkgo
 
 unit-tests: unit-test
 
-linter: gotools check-deps
+linter: gotools-basic-install check-deps
 	@echo "LINT: Running code checks.."
 	@scripts/golinter.sh
 
-check-deps:
+check-deps: gotool.dep
 	@echo "DEP: Checking for dependency issues.."
 	@scripts/check_deps.sh
 
