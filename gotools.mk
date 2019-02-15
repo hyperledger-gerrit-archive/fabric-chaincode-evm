@@ -23,6 +23,9 @@ go.fqp.manifest-tool       := github.com/estesp/manifest-tool
 .PHONY: gotools-install
 gotools-install: $(patsubst %,$(GOTOOLS_BINDIR)/%, $(GOTOOLS))
 
+.PHONY: gotools-basic-install
+gotools-basic-install: $(GOTOOLS_BINDIR)/goimports $(GOTOOLS_BINDIR)/golint
+
 .PHONY: gotools-clean
 gotools-clean:
 	-@rm -rf $(BUILD_DIR)/gotools
