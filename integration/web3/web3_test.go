@@ -115,12 +115,18 @@ var _ = Describe("Web3 Integration", func() {
 		user1ProxyRunner := helpers.Fab3Runner(components.Paths["fab3"], proxyConfigPath, "Org1", "User1", channelName, ccid, user1ProxyPort)
 		user1Proxy = ifrit.Invoke(user1ProxyRunner)
 		Eventually(user1Proxy.Ready(), LongEventualTimeout, LongPollingInterval).Should(BeClosed())
+		Eventually(func() error {
+			return helpers.DialLocalFab3(user1ProxyPort)
+		}).Should(Succeed())
 
 		By("starting up a fab3 for user 2")
 		user2ProxyPort := network.ReservePort()
 		user2ProxyRunner := helpers.Fab3Runner(components.Paths["fab3"], proxyConfigPath, "Org2", "User2", channelName, ccid, user2ProxyPort)
 		user2Proxy = ifrit.Invoke(user2ProxyRunner)
 		Eventually(user2Proxy.Ready(), LongEventualTimeout, LongPollingInterval).Should(BeClosed())
+		Eventually(func() error {
+			return helpers.DialLocalFab3(user2ProxyPort)
+		}).Should(Succeed())
 
 		By("running the web3 tests")
 		web3TestRunner := helpers.Web3TestRunner(

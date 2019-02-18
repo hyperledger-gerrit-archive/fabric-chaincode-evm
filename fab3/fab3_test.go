@@ -60,8 +60,12 @@ var _ = Describe("Fab3", func() {
 
 			//Ensure the server is up before starting the test
 			Eventually(func() error {
-				conn, err := net.Dial("tcp", "golang.org:80")
-				defer conn.Close()
+				conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
+				defer func() {
+					if conn != nil {
+						conn.Close()
+					}
+				}()
 				return err
 			}).Should(Succeed())
 
