@@ -11,10 +11,12 @@ import (
 	"os/exec"
 	"strconv"
 
-	. "github.com/onsi/ginkgo"
+	"github.com/hyperledger/fabric-chaincode-evm/integration/helpers"
 	"github.com/onsi/ginkgo/config"
-	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
+
+	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Fab3 Configuration", func() {
@@ -49,7 +51,7 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("starting-fab3"))
+		helpers.WaitForFab3(proxyPort)
 	})
 
 	It("can be configured with flags", func() {
@@ -68,8 +70,7 @@ var _ = Describe("Fab3 Configuration", func() {
 
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
-
-		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":%d", proxyPort))
+		helpers.WaitForFab3(proxyPort)
 	})
 
 	It("will use flag values over environment variables ", func() {
@@ -95,7 +96,7 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":%d", proxyPort))
+		helpers.WaitForFab3(proxyPort)
 	})
 
 	It("requires config to be set", func() {
@@ -202,6 +203,6 @@ var _ = Describe("Fab3 Configuration", func() {
 		err := proxyCmd.Start()
 		Expect(err).ToNot(HaveOccurred())
 
-		Eventually(output).Should(gbytes.Say("\"msg\":\"starting-fab3\",\"port\":5000"))
+		helpers.WaitForFab3(5000)
 	})
 })

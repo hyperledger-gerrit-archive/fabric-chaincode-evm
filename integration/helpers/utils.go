@@ -7,6 +7,9 @@ SPDX-License-Identifier: Apache-2.0
 package helpers
 
 import (
+	"fmt"
+	"net"
+
 	"github.com/hyperledger/fabric/integration/nwo"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -89,4 +92,16 @@ func Build() *nwo.Components {
 	components.Paths["fab3"] = proxyBinPath
 
 	return components
+}
+
+func WaitForFab3(port uint16) {
+	Eventually(func() error {
+		conn, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", port))
+		defer func() {
+			if conn != nil {
+				conn.Close()
+			}
+		}()
+		return err
+	}).Should(Succeed())
 }
