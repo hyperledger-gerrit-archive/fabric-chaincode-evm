@@ -186,6 +186,30 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 					Expect(res.Status).To(Equal(int32(shim.OK)))
 					Expect(string(res.Payload)).To(Equal(runtimeCode))
 				})
+
+				Context("when queried contract address does not exist", func() {
+					BeforeEach(func() {
+						stub.GetArgsReturns([][]byte{[]byte("getCode"), []byte("0000000000000000000000000000000000000001")})
+					})
+
+					It("does not error and returns empty bytes", func() {
+						res := evmcc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.OK)))
+						Expect(string(res.Payload)).To(BeEmpty())
+					})
+				})
+
+				Context("when the queried contract address is malformed", func() {
+					BeforeEach(func() {
+						stub.GetArgsReturns([][]byte{[]byte("getCode"), []byte("malformed-address")})
+					})
+
+					It("does not error and returns empty bytes", func() {
+						res := evmcc.Invoke(stub)
+						Expect(res.Status).To(Equal(int32(shim.ERROR)))
+						Expect(res.Message).To(ContainSubstring("failed to decode callee address"))
+					})
+				})
 			})
 
 			Context("when another contract is deployed", func() {
