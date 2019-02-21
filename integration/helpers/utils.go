@@ -84,3 +84,71 @@ func Build() *nwo.Components {
 
 	return components
 }
+
+func SimpleSoloNetwork() *nwo.Config {
+	return &nwo.Config{
+		Organizations: []*nwo.Organization{{
+			Name:          "OrdererOrg",
+			MSPID:         "OrdererMSP",
+			Domain:        "example.com",
+			EnableNodeOUs: false,
+			Users:         0,
+			CA:            &nwo.CA{Hostname: "ca"},
+		}, {
+			Name:          "Org1",
+			MSPID:         "Org1MSP",
+			Domain:        "org1.example.com",
+			EnableNodeOUs: true,
+			Users:         2,
+			CA:            &nwo.CA{Hostname: "ca"},
+		}, {
+			Name:          "Org2",
+			MSPID:         "Org2MSP",
+			Domain:        "org2.example.com",
+			EnableNodeOUs: true,
+			Users:         2,
+			CA:            &nwo.CA{Hostname: "ca"},
+		}},
+		Consortiums: []*nwo.Consortium{{
+			Name: "SampleConsortium",
+			Organizations: []string{
+				"Org1",
+				"Org2",
+			},
+		}},
+		Consensus: &nwo.Consensus{
+			Type: "solo",
+		},
+		SystemChannel: &nwo.SystemChannel{
+			Name:    "systemchannel",
+			Profile: "TwoOrgsOrdererGenesis",
+		},
+		Orderers: []*nwo.Orderer{
+			{Name: "orderer", Organization: "OrdererOrg"},
+		},
+		Channels: []*nwo.Channel{
+			{Name: "testchannel", Profile: "TwoOrgsChannel"},
+		},
+		Peers: []*nwo.Peer{{
+			Name:         "peer0",
+			Organization: "Org1",
+			Channels: []*nwo.PeerChannel{
+				{Name: "testchannel", Anchor: true},
+			},
+		}, {
+			Name:         "peer0",
+			Organization: "Org2",
+			Channels: []*nwo.PeerChannel{
+				{Name: "testchannel", Anchor: true},
+			},
+		}},
+		Profiles: []*nwo.Profile{{
+			Name:     "TwoOrgsOrdererGenesis",
+			Orderers: []string{"orderer"},
+		}, {
+			Name:          "TwoOrgsChannel",
+			Consortium:    "SampleConsortium",
+			Organizations: []string{"Org1", "Org2"},
+		}},
+	}
+}
