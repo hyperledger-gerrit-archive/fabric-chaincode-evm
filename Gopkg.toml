@@ -2,7 +2,8 @@
 #SPDX-License-Identifier: Apache-2.0
 
 noverify = [
-    "github.com/grpc-ecosystem/go-grpc-middleware"
+    "github.com/grpc-ecosystem/go-grpc-middleware",
+    "github.com/hyperledger/burrow"
 ]
 
 [[constraint]]
