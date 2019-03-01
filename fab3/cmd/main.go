@@ -71,7 +71,7 @@ func initFlags() {
 	viper.BindPFlag("ccid", fab3Cmd.PersistentFlags().Lookup("ccid"))
 
 	//Port defaults to 5000 if PORT is not set or `-p,-port` is not provided
-	fab3Cmd.PersistentFlags().IntVarP(&port, "port", "p", 5000, "Port that Fab3 will be running on. Can also set PORT")
+	fab3Cmd.PersistentFlags().IntVarP(&port, "port", "p", 5000, "Port that Fab3 will be running on. Can also set FAB3_PORT")
 	viper.BindPFlag("port", fab3Cmd.PersistentFlags().Lookup("port"))
 }
 
