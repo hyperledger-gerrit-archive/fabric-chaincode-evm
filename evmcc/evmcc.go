@@ -15,7 +15,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/burrow/acm"
-	"github.com/hyperledger/burrow/binary"
 	"github.com/hyperledger/burrow/crypto"
 	"github.com/hyperledger/burrow/execution/evm"
 	"github.com/hyperledger/burrow/logging"
@@ -91,34 +90,17 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 
 	var gas uint64 = 10000
 	state := statemanager.NewStateManager(stub)
-	evmCache := evm.NewState(state)
+	evmCache := evm.NewState(state, func(height uint64) []byte {
+		return []byte("BlockyMcHash")
+	})
 	eventSink := &eventmanager.EventManager{Stub: stub}
-	vm := evm.NewVM(newParams(), callerAddr, nil, evmLogger)
+	nonce := crypto.Nonce(callerAddr, []byte(stub.GetTxID()))
 
 	if calleeAddr == crypto.ZeroAddress {
 		logger.Debugf("Deploy contract")
 
-		// Sequence number is used to create the contract address.
-		seq := evmCache.GetSequence(callerAddr)
-
-		// Sequence number of 0 means this is the caller's first contract
-		// Therefore a new account needs to be created for them to keep track of their sequence.
-		if seq == 0 {
-			evmCache.CreateAccount(callerAddr)
-			if evmErr := evmCache.Error(); evmErr != nil {
-				return shim.Error(fmt.Sprintf("failed to create user account: %s ", evmErr))
-			}
-		}
-
-		// Update contract seq
-		// If sequence is not incremented every contract a person deploys with have the same contract address.
-		logger.Debugf("Contract sequence number = %d", seq)
-		evmCache.IncSequence(callerAddr)
-		if evmErr := evmCache.Error(); evmErr != nil {
-			return shim.Error(fmt.Sprintf("failed to update user account sequence number: %s ", evmErr))
-		}
-
-		contractAddr := crypto.NewContractAddress(callerAddr, seq)
+		logger.Debugf("Contract nonce number = %d", nonce)
+		contractAddr := crypto.NewContractAddress(callerAddr, nonce)
 		// Contract account needs to be created before setting code to it
 		evmCache.CreateAccount(contractAddr)
 		if evmErr := evmCache.Error(); evmErr != nil {
@@ -130,6 +112,7 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 			return shim.Error(fmt.Sprintf("failed to set contract account permissions: %s ", evmErr))
 		}
 
+		vm := evm.NewVM(newParams(), callerAddr, nonce, evmLogger)
 		rtCode, evmErr := vm.Call(evmCache, eventSink, callerAddr, contractAddr, input, input, 0, &gas)
 		if evmErr != nil {
 			return shim.Error(fmt.Sprintf("failed to deploy code: %s", evmErr))
@@ -162,6 +145,7 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 			return shim.Error(fmt.Sprintf("failed to retrieve contract code: %s", evmErr))
 		}
 
+		vm := evm.NewVM(newParams(), callerAddr, nonce, evmLogger)
 		output, evmErr := vm.Call(evmCache, eventSink, callerAddr, calleeAddr, calleeCode, input, 0, &gas)
 		if evmErr != nil {
 			return shim.Error(fmt.Sprintf("failed to execute contract: %s", evmErr))
@@ -229,7 +213,6 @@ func (evmcc *EvmChaincode) account(stub shim.ChaincodeStubInterface) pb.Response
 func newParams() evm.Params {
 	return evm.Params{
 		BlockHeight: 0,
-		BlockHash:   binary.Zero256,
 		BlockTime:   0,
 		GasLimit:    0,
 	}
