@@ -19,13 +19,13 @@
 #   - update-mocks - update the counterfeiter test doubles
 #
 ARCH=$(shell go env GOARCH)
-BASEIMAGE_RELEASE=0.4.13
 BASE_DOCKER_NS ?= hyperledger
 BASE_DOCKER_TAG=$(ARCH)-$(BASEIMAGE_RELEASE)
 FABRIC_RELEASE=1.4
 PREV_VERSION=6111630c6cf12d3ca31559e93e33e9dad1e6f402
 BASE_VERSION=0.1.0
 
+BASEIMAGE_RELEASE = $(shell grep "BASEIMAGE_RELEASE" ci.properties |cut -d'=' -f2-)
 PACKAGES = ./statemanager/... ./evmcc/... ./fab3/ ./eventmanager/...
 
 EXECUTABLES ?= go git curl docker
@@ -76,15 +76,20 @@ check-deps: gotool.dep
 changelog:
 	@scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
 
+.PHONY: docker-images
 docker-images:
-	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE)
-	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest
-	docker pull $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-couchdb
-	docker pull $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-zookeeper
-	docker pull $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-kafka
+	@echo "Pull Thirdparty Images"
+	for IMAGE in couchdb kafka zookeeper; do \
+		set -x; \
+		docker pull $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) > /dev/null; \
+		docker tag $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-$$IMAGE > /dev/null; \
+		set +x; \
+	done
+	@echo -e "\033[1m PULL javaenv IMAGE\033[0m"
+	set -x
+	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) > /dev/null
+	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest > /dev/null
+	set +x
 
 .PHONY: integration-test
 integration-test: docker-images gotool.ginkgo
