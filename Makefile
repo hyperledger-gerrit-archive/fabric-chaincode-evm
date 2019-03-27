@@ -76,15 +76,20 @@ check-deps: gotool.dep
 changelog:
 	@scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
 
+.PHONY: docker-images
 docker-images:
-	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE)
-	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest
-	docker pull $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-couchdb
-	docker pull $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-zookeeper
-	docker pull $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-kafka
+	@echo "Pull Thirdparty Images"
+	for IMAGE in couchdb kafka zookeeper; do \
+		set -x; \
+		docker pull $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) > /dev/null; \
+		docker tag $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-$$IMAGE > /dev/null; \
+		set +x; \
+	done
+	set -x
+	@echo -e "\033[1m PULL javaenv IMAGE\033[0m"
+	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) > /dev/null
+	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest > /dev/null
+	set +x
 
 .PHONY: integration-test
 integration-test: docker-images gotool.ginkgo
