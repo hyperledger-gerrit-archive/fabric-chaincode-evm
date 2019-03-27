@@ -40,11 +40,11 @@ basic-checks: license spelling linter build
 
 .PHONY: spelling
 spelling: gotool.misspell
-	@scripts/check_spelling.sh
+	scripts/check_spelling.sh
 
 .PHONY: license
 license:
-	@scripts/check_license.sh
+	scripts/check_license.sh
 
 .PHONY: build
 build: bin/fab3 bin/evmcc
@@ -60,13 +60,13 @@ gotools: gotools-install
 
 unit-test: $(PROJECT_FILES) gotool.ginkgo
 	@echo "Running unit-tests"
-	@ginkgo -r -randomizeAllSpecs -noColor -keepGoing -race -tags "$(GO_TAGS)" $(PACKAGES)
+	ginkgo -r -randomizeAllSpecs -noColor -keepGoing -race -tags "$(GO_TAGS)" $(PACKAGES)
 
 unit-tests: unit-test
 
 linter: gotool.goimports gotool.golint check-deps
 	@echo "LINT: Running code checks.."
-	@scripts/golinter.sh
+	scripts/golinter.sh
 
 check-deps: gotool.dep
 	@echo "DEP: Checking for dependency issues.."
@@ -74,22 +74,28 @@ check-deps: gotool.dep
 	dep check
 
 changelog:
-	@scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
+	scripts/changelog.sh v$(PREV_VERSION) v$(BASE_VERSION)
 
+.PHONY: docker-images
 docker-images:
-	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE)
-	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest
-	docker pull $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-couchdb:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-couchdb
-	docker pull $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-zookeeper:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-zookeeper
-	docker pull $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG)
-	docker tag $(BASE_DOCKER_NS)/fabric-kafka:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-kafka
+	@echo "Pull Thirdparty Images"
+	for IMAGE in couchdb kafka zookeeper; do \
+		echo -e "\033[1m PULL $$IMAGE IMAGE\033[0m"; \
+		set -x; \
+		docker pull $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) > /dev/null; \
+		docker tag $(BASE_DOCKER_NS)/fabric-$$IMAGE:$(BASE_DOCKER_TAG) $(BASE_DOCKER_NS)/fabric-$$IMAGE > /dev/null; \
+		set +x; \
+	done
+	set -x
+	@echo -e "\033[1m PULL javaenv IMAGE\033[0m"
+	docker pull $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) > /dev/null
+	docker tag $(BASE_DOCKER_NS)/fabric-javaenv:$(FABRIC_RELEASE) $(BASE_DOCKER_NS)/fabric-javaenv:$(ARCH)-latest > /dev/null
+	set +x
 
 .PHONY: integration-test
 integration-test: docker-images gotool.ginkgo
 	@echo "Running integration-test"
-	@scripts/run-integration-tests.sh
+	scripts/run-integration-tests.sh
 
 fab3: bin/fab3
 
