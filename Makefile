@@ -26,8 +26,6 @@ FABRIC_RELEASE=1.4
 PREV_VERSION=6111630c6cf12d3ca31559e93e33e9dad1e6f402
 BASE_VERSION=0.1.0
 
-PACKAGES = ./statemanager/... ./evmcc/... ./fab3/ ./eventmanager/...
-
 EXECUTABLES ?= go git curl docker
 K := $(foreach exec,$(EXECUTABLES),\
 	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
@@ -60,7 +58,7 @@ gotools: gotools-install
 
 unit-test: $(PROJECT_FILES) gotool.ginkgo
 	@echo "Running unit-tests"
-	@ginkgo -r -randomizeAllSpecs -noColor -keepGoing -race -tags "$(GO_TAGS)" $(PACKAGES)
+	ginkgo -p -randomizeAllSpecs -randomizeSuites -requireSuite -noColor -keepGoing -race -cover -skipPackage integration -r
 
 unit-tests: unit-test
 
