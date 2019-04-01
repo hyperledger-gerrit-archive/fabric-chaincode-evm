@@ -20,6 +20,7 @@ function filterExcludedFiles {
 		| grep -v "release_notes/" \
 		| grep -v "^LICENSE$" \
 		| grep -v "\.png$" \
+		| grep -v "\.jpg$" \
 		| grep -v "\.rst$" \
 		| grep -v "\.pem$" \
 		| grep -v "\.block$" \
