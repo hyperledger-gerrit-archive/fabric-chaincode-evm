@@ -290,3 +290,38 @@ curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
   "id": 1
 }
 ```
+
+### eth_getLogs
+`eth_getLogs` 
+[getLogs](https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs)
+
+
+**Example**
+```
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getLogs",
+  "id":1,
+  "params":[{"fromBlock":"earliest", "address":"0x4550dd67c85d79875df5f2d4ab0719c3071f8060", "topics":["0xdd611e8d05f58b9581bed4b946a053020008d51f9c0178f0dc67fad6e4e85f89"]}]
+}' 
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": [
+    {
+      "address": "0x4550dd67c85d79875df5f2d4ab0719c3071f8060",
+      "topics": [
+        "0xdd611e8d05f58b9581bed4b946a053020008d51f9c0178f0dc67fad6e4e85f89"
+      ],
+      "data": "0x000000000000000000000000000000000000000000000000000000000000000a",
+      "blockNumber": "0x2",
+      "transactionHash": "0x647308ac48ce85236487266cbe9581c5280b97d3eeb8573af98413f164a1c27a",
+      "transactionIndex": "0x0",
+      "blockHash": "0x7a47720c5a92f30d0d17847deb6611df4b09d97b61d71ecb3fbeb8243f48f886",
+      "logIndex": "0x0",
+      "removed": false
+    }
+  ]
+}
+```
