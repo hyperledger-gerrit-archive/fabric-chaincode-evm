@@ -58,6 +58,7 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 		ToBlock   string      `json:"toBlock"`
 		Address   interface{} `json:"address"` // string or array of strings.
 		Topics    interface{} `json:"topics"`  // array of strings, or array of array of strings
+		BlockHash string      `json:"lockHash"`
 	}
 	var input inputGetLogsArgs
 	if err := json.Unmarshal(data, &input); err != nil {
