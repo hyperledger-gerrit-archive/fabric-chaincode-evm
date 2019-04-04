@@ -295,15 +295,16 @@ curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
 `eth_getLogs` returns matching log objects from all transactions within the matching range of
 blocks. These log objects are conversions from the fabric event object on the transaction. According
 to the spec, [getLogs](https://github.com/ethereum/wiki/wiki/JSON-RPC#eth_getlogs) takes 5
-arguments. All are optional. FromBlock and ToBlock are used to specify the range of blocks inclusive
-to search for matching log objects. FromBlock and ToBlock accept a number that is hex encoded or a
-default block parameter such as `latest`, and `earliest`. Fabric does not have a concept of
-`pending` blocks so providing `pending` as the block number will result in an error. Address is an
-individual address or array of addresses which must match the entries in the log objects. Topics is
-an array of matching topics which must match the entries of the log objects. See the [spec for the
+arguments. All are optional and BlockHash cannot be combined with FromBlock or ToBlock. FromBlock
+and ToBlock are used to specify the inclusive range of blocks to search for matching log
+objects. FromBlock and ToBlock accept a number that is hex encoded or a default block parameter such
+as `latest`, and `earliest`. Fabric does not have a concept of `pending` blocks so providing
+`pending` as the block number will result in an error. Address is an individual address or array of
+addresses which must match the entries in the log objects. Topics is an array of matching topics
+which must match the entries of the log objects.  See the [spec for the
 format](https://github.com/ethereum/wiki/wiki/JSON-RPC#a-note-on-specifying-topic-filters) of topic
-filters.
-
+filters. BlockHash is the exact hash of a fabric block, which will be the only block searched for
+transactions that contain matching log entries.
 
 **Example**
 ```
