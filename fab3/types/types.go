@@ -58,6 +58,7 @@ func (gla *GetLogsArgs) UnmarshalJSON(data []byte) error {
 		ToBlock   string      `json:"toBlock"`
 		Address   interface{} `json:"address"` // string or array of strings.
 		Topics    interface{} `json:"topics"`  // array of strings, or array of array of strings
+		BlockHash string      `json:"lockHash"`
 	}
 	var input inputGetLogsArgs
 	if err := json.Unmarshal(data, &input); err != nil {
@@ -158,6 +159,7 @@ func NewTopicFilter(s string) (TopicFilter, error) {
 		return nil, fmt.Errorf("topic in wrong format, need 64 chars prefixed with '0x', got %d for %q", len(s), s)
 	}
 	return TopicFilter{s}, nil
+	b
 }
 
 func NewTopicsFilter(tf ...TopicFilter) TopicsFilter {
