@@ -1127,7 +1127,7 @@ var _ = Describe("Ethservice", func() {
 		})
 		Context("when valid arguments are given; with Block Number 2 available as the latest block", func() {
 			BeforeEach(func() {
-				mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 2}}, nil)
+				mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 3}}, nil)
 				sampleBlock1 := GetSampleBlock(1)
 				sampleBlock2 := GetSampleBlock(2)
 				qbs := func(b uint64, _ ...ledger.RequestOption) (*common.Block, error) {
@@ -1137,14 +1137,11 @@ var _ = Describe("Ethservice", func() {
 					} else if b == 2 {
 						return sampleBlock2, nil
 					} else {
-						return nil, fmt.Errorf("no block")
+						return nil, fmt.Errorf("no block available for block number %d", b)
 					}
 				}
 				mockLedgerClient.QueryBlockStub = qbs
-				logsArgs = &types.GetLogsArgs{FromBlock: "1", ToBlock: "2"}
-				Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).To(Succeed())
-				Expect(len(*reply)).To(Equal(4))
-
+				mockLedgerClient.QueryBlockByHashReturns(sampleBlock2, nil)
 				logsArgs = &types.GetLogsArgs{}
 				reply = &[]types.Log{}
 			})
@@ -1165,6 +1162,12 @@ var _ = Describe("Ethservice", func() {
 			// Block references as input
 			It("returns the latest block when explicitly asking for latest", func() {
 				logsArgs = &types.GetLogsArgs{FromBlock: "latest", ToBlock: "latest"}
+				Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).To(Succeed())
+				Expect(len(*reply)).To(Equal(2))
+			})
+
+			It("returns events from the requested block when asking by blockhash", func() {
+				logsArgs = &types.GetLogsArgs{BlockHash: "deff"}
 				Expect(ethservice.GetLogs(&http.Request{}, logsArgs, reply)).To(Succeed())
 				Expect(len(*reply)).To(Equal(2))
 			})

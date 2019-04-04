@@ -44,7 +44,7 @@ type LedgerClient interface {
 	QueryInfo(options ...ledger.RequestOption) (*fab.BlockchainInfoResponse, error)
 	QueryBlock(blockNumber uint64, options ...ledger.RequestOption) (*common.Block, error)
 	QueryBlockByTxID(txid fab.TransactionID, options ...ledger.RequestOption) (*common.Block, error)
-	QueryTransaction(txid fab.TransactionID, options ...ledger.RequestOption) (*peer.ProcessedTransaction, error)
+	QueryBlockByHash(blockHash []byte, options ...ledger.RequestOption) (*common.Block, error)
 }
 
 //go:generate counterfeiter -o ../mocks/fab3/mockethservice.go --fake-name MockEthService ./ EthService
@@ -380,36 +380,53 @@ func (s *ethService) GetTransactionByHash(r *http.Request, txID *string, reply *
 	return nil
 }
 
-//GetLogs currently returns all logs in range FromBlock to ToBlock
+// GetLogs returns matching logs in range FromBlock to ToBlock. If BlockHash is specified, the
+// single matching block is searched for logs.
 func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]types.Log) error {
 	logger := s.logger.With("method", "GetLogs")
 	logger.Debug("parameters", args)
 
-	// set defaults *after* checking for input conflicts and validating
-	if args.FromBlock == "" {
-		args.FromBlock = "latest"
-	}
-	if args.ToBlock == "" {
-		args.ToBlock = "latest"
-	}
-
 	var from, to uint64
-	from, err := s.parseBlockNum(args.FromBlock)
-	if err != nil {
-		return errors.Wrap(err, "failed to parse the block number")
-	}
-	// check if both from and to are the same to avoid doing two
-	// queries to the fabric network.
-	if args.FromBlock == args.ToBlock {
-		to = from
+	var err error
+	if args.BlockHash != "" {
+		logger.Debug("looking for block by hash")
+		hash, err := hex.DecodeString(args.BlockHash)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse the block hash")
+		}
+		block, err := s.ledgerClient.QueryBlockByHash(hash)
+		if err != nil {
+			return errors.Wrap(err, "failed to find block by block hash")
+		}
+		blockNumber := block.Header.Number
+		from = blockNumber
+		to = blockNumber
 	} else {
-		to, err = s.parseBlockNum(args.ToBlock)
+		// set defaults *after* checking for input conflicts and validating
+		if args.FromBlock == "" {
+			args.FromBlock = "latest"
+		}
+		if args.ToBlock == "" {
+			args.ToBlock = "latest"
+		}
+
+		from, err = s.parseBlockNum(args.FromBlock)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse the block number")
 		}
-	}
-	if from > to {
-		return fmt.Errorf("fromBlock number greater than toBlock number")
+		// check if both from and to are the same to avoid doing two
+		// queries to the fabric network.
+		if args.FromBlock == args.ToBlock {
+			to = from
+		} else {
+			to, err = s.parseBlockNum(args.ToBlock)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse the block number")
+			}
+		}
+		if from > to {
+			return fmt.Errorf("fromBlock number greater than toBlock number")
+		}
 	}
 
 	var txLogs []types.Log
