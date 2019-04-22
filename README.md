@@ -26,18 +26,12 @@ to use with Hyperledger Fabric.
 ![EndToEnd](EndToEnd.png)
 
 # Table of Contents
-* [Deploying the Fabric EVM Chaincode (EVMCC)](#Deploying-the-Fabric-EVM-Chaincode-(EVMCC))
-* [Running Fab3](#Running-Fab3)
-* [Tutorial](#Tutorial)
-  * [Tutorial Link](examples/EVM_Smart_Contracts.md)
-* [Testing](#Testing)
-  * [end-2-end Test](integration/e2e/e2e_test.go)
-  * [fab3 Test](integration/fab3/fab3_test.go)
-  * [web3 Test](integration/fab3/web3_e2e_test.js)
-* [Contributions](#Contributions)
-  * [Gerrit Repository](https://gerrit.hyperledger.org/r/#/admin/projects/fabric-chaincode-evm)
-  * [JIRA Page](https://jira.hyperledger.org/projects/FAB/issues)
-* [Current Dependencies](#Current-Dependencies)
+- [Deploying the Fabric EVM Chaincode (EVMCC)](#Deploying-the-Fabric-EVM-Chaincode-(EVMCC))
+- [Running Fab3](#Running-Fab3)
+- [Tutorial](#Tutorial)
+- [Testing](#Testing)
+- [Contributions](#Contributions)
+- [Current Dependencies](#Current-Dependencies)
 
 We hang out in the
 [#fabric-evm channel](https://chat.hyperledger.org/channel/fabric-evm). We are
