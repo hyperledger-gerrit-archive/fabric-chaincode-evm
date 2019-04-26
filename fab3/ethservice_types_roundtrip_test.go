@@ -30,21 +30,31 @@ var _ = Describe("ethereum json rpc struct fields", func() {
 			}
 		}
 
-		It("for TxReceipt with the proper cases", func() {
+		It("uses the proper cases for TxReceipt when contractAddress is included", func() {
 			fieldNames := []string{"transactionHash", "transactionIndex",
 				"blockHash", "blockNumber", "contractAddress", "gasUsed",
 				"cumulativeGasUsed", "to", "status", "logs"}
+			assertTypeMarshalsJSONFields(fieldNames, types.TxReceipt{ContractAddress: "some-address"})
+		})
+
+		It("does not have contractAddress key when it is empty in TxReceipt", func() {
+			fieldNames := []string{"transactionHash", "transactionIndex",
+				"blockHash", "blockNumber", "gasUsed",
+				"cumulativeGasUsed", "to", "status", "logs"}
 			assertTypeMarshalsJSONFields(fieldNames, types.TxReceipt{})
 		})
+
 		It("for Log subobjects in TxReceipt with the proper cases", func() {
 			fieldNames := []string{"address", "topics", "data", "blockNumber",
 				"transactionHash", "transactionIndex", "blockHash", "logIndex"}
 			assertTypeMarshalsJSONFields(fieldNames, types.Log{Data: "somedata"})
 		})
+
 		It("for Transaction with the proper cases", func() {
 			fieldNames := []string{"blockHash", "blockNumber", "to", "input", "transactionIndex", "hash"}
 			assertTypeMarshalsJSONFields(fieldNames, types.Transaction{})
 		})
+
 		It("for Block with the proper cases", func() {
 			fieldNames := []string{"number", "hash", "parentHash", "transactions"}
 			assertTypeMarshalsJSONFields(fieldNames, types.Block{})
