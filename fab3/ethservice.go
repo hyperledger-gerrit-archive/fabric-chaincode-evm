@@ -79,7 +79,11 @@ type EthService interface {
 	GetTransactionCount(r *http.Request, _ *interface{}, reply *string) error
 	GetLogs(*http.Request, *types.GetLogsArgs, *[]types.Log) error
 	NewFilter(*http.Request, *types.GetLogsArgs, *string) error
+	NewBlockFilter(*http.Request, *interface{}, *string) error
+	// NewPendingTransactionFilter (*http.Request, *types.GetLogsArgs, *string) error
 	UninstallFilter(*http.Request, *string, *bool) error
+	// GetFilterChanges (*http.Request, *string, *[]interface{}) error
+	// GetFilterLogs(*http.Request, *string, *bool) error
 }
 
 type ethService struct {
@@ -87,11 +91,41 @@ type ethService struct {
 	ledgerClient  LedgerClient
 	channelID     string
 	ccid          string
-	logger        *zap.SugaredLogger
+	logger        fab3logger
 	// should we use sync.Map?
 	filterMapLock sync.Mutex
-	filterMap     map[uint64]interface{}
+	filterMap     map[uint64]filterEntry
 	filterSeq     uint64
+}
+
+type fab3logger interface {
+	With(args ...interface{})
+}
+
+type filterType int
+
+const (
+	logs filterType = iota
+	block
+	txns
+)
+
+func (ft filterType) filter() interface{} {
+	switch ft {
+	case logs:
+	case block:
+	case txns:
+	default:
+	}
+	return struct{}{}
+}
+
+type filterEntry struct {
+	// filterType
+	// logsFilter
+	// blockfilter
+	// txnsFilter
+
 }
 
 func NewEthService(channelClient ChannelClient, ledgerClient LedgerClient, channelID string, ccid string, logger *zap.SugaredLogger) EthService {
@@ -508,6 +542,17 @@ func (s *ethService) GetLogs(r *http.Request, args *types.GetLogsArgs, logs *[]t
 }
 
 func (s *ethService) NewFilter(_ *http.Request, filter *types.GetLogsArgs, result *string) error {
+	s.filterMapLock.Lock()
+	s.filterSeq++
+	index := s.filterSeq
+
+	s.filterMap[index] = filter
+	s.filterMapLock.Unlock()
+	*result = "0x" + strconv.FormatUint(index, 16)
+	return nil
+}
+
+func (s *ethService) NewBlockFilter(_ *http.Request, filter *types.GetLogsArgs, result *string) error {
 	s.filterMapLock.Lock()
 	s.filterSeq++
 	index := s.filterSeq
