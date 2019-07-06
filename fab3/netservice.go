@@ -6,9 +6,12 @@ SPDX-License-Identifier: Apache-2.0
 
 package fab3
 
-import "net/http"
+import (
+	"net/http"
+)
 
-const NetworkID = "fabric-evm"
+// NetworkID is the hex encoding of the string "fabric-evm"
+const NetworkID = "0x6661627269632d65766d"
 
 // NetService returns data about the network the client is connected
 // to.
