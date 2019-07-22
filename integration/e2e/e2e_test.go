@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -30,14 +31,15 @@ const LongEventualTimeout = time.Minute
 
 var _ = Describe("EndToEnd", func() {
 	var (
-		testDir        string
-		client         *docker.Client
-		network        *nwo.Network
-		chaincode      nwo.Chaincode
-		process        ifrit.Process
-		zeroAddress    = "0000000000000000000000000000000000000000"
-		SimpleStorage  = helpers.SimpleStorageContract()
-		InvokeContract = helpers.InvokeContract()
+		testDir              string
+		client               *docker.Client
+		network              *nwo.Network
+		chaincode            nwo.Chaincode
+		process              ifrit.Process
+		zeroAddress          = "0000000000000000000000000000000000000000"
+		SimpleStorage        = helpers.SimpleStorageContract()
+		InvokeContract       = helpers.InvokeContract()
+		SimpleStorageCreator = helpers.SimpleStorageCreator()
 	)
 
 	BeforeEach(func() {
@@ -88,7 +90,7 @@ var _ = Describe("EndToEnd", func() {
 		By("getting the client peer by name")
 		peer := network.Peer("Org1", "peer0")
 
-		By("installing a Simple Storage SmartContract")
+		// By("installing a Simple Storage SmartContract")
 		sess, err := network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
 			ChannelID: "testchannel",
 			Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
@@ -133,7 +135,6 @@ var _ = Describe("EndToEnd", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
 		output, _ = sess.Command.CombinedOutput()
-		fmt.Println(string(output))
 		Expect(sess.Out).To(gbytes.Say(SimpleStorage.RuntimeBytecode))
 
 		By("querying the smart contract")
@@ -146,7 +147,6 @@ var _ = Describe("EndToEnd", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
 		output, _ = sess.Command.CombinedOutput()
-		fmt.Println(string(output))
 		Expect(sess.Out).To(gbytes.Say("0000000000000000000000000000000000000000000000000000000000000003"))
 
 		By("deploying an InvokeContract to invoke SimpleStorage")
@@ -194,7 +194,6 @@ var _ = Describe("EndToEnd", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
 		output, _ = sess.Command.CombinedOutput()
-		fmt.Println(string(output))
 		Expect(sess.Out).To(gbytes.Say("0000000000000000000000000000000000000000000000000000000000000008"))
 
 		// The following query tests the opcode STATICCALL
@@ -208,7 +207,120 @@ var _ = Describe("EndToEnd", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
 		output, _ = sess.Command.CombinedOutput()
-		fmt.Println(string(output))
 		Expect(sess.Out).To(gbytes.Say("0000000000000000000000000000000000000000000000000000000000000008"))
+
+		By("testing Contract Creation through a Contract")
+		By("deploying SimpleStorageCreator")
+		sess, err = network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
+			ChannelID: "testchannel",
+			Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
+			Name:      "evmcc",
+			Ctor:      fmt.Sprintf(`{"Args":["%s","%s"]}`, zeroAddress, SimpleStorageCreator.CompiledBytecode),
+			PeerAddresses: []string{
+				network.PeerAddress(network.Peer("Org1", "peer0"), nwo.ListenPort),
+			},
+			WaitForEvent: true,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
+		Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
+
+		output = sess.Err.Contents()
+		creatorAddr := string(regexp.MustCompile(`Chaincode invoke successful. result: status:200 payload:"([0-9a-fA-F]{40})"`).FindSubmatch(output)[1])
+		Expect(creatorAddr).ToNot(BeEmpty())
+
+		By("creating a SimpleStorage by invoking the Creator Contract")
+		sess, err = network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
+			ChannelID: "testchannel",
+			Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
+			Name:      "evmcc",
+			//SimpleStorageCreator.createSimpleStorage() which will create a new instance of SimpleStorage.
+			Ctor: fmt.Sprintf(`{"Args":["%s","%s"]}`, creatorAddr, SimpleStorageCreator.FunctionHashes["createSimpleStorage"]),
+			PeerAddresses: []string{
+				network.PeerAddress(network.Peer("Org1", "peer0"), nwo.ListenPort),
+			},
+			WaitForEvent: true,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
+		Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
+
+		output = sess.Err.Contents()
+		createdAddrOutput := regexp.MustCompile(`Chaincode invoke successful. result: status:200 payload:"([\S\s]+)"\s`).FindSubmatch(output)[1]
+		createdAddr := peerCLIAddressToHex(createdAddrOutput)
+		Expect(createdAddr).ToNot(Equal(creatorAddr))
+
+		By("invoking the smart contract")
+		sess, err = network.PeerUserSession(peer, "User1", commands.ChaincodeInvoke{
+			ChannelID: "testchannel",
+			Orderer:   network.OrdererAddress(orderer, nwo.ListenPort),
+			Name:      "evmcc",
+			//set(3)
+			Ctor: fmt.Sprintf(`{"Args":["%s","%s0000000000000000000000000000000000000000000000000000000000000005"]}`, createdAddr, SimpleStorage.FunctionHashes["set"]),
+			PeerAddresses: []string{
+				network.PeerAddress(network.Peer("Org1", "peer0"), nwo.ListenPort),
+			},
+			WaitForEvent: true,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
+		Expect(sess.Err).To(gbytes.Say("Chaincode invoke successful. result: status:200"))
+
+		By("querying the smart contract")
+		sess, err = network.PeerUserSession(peer, "User1", helpers.ChaincodeQueryWithHex{
+			ChannelID: "testchannel",
+			Name:      "evmcc",
+			//get()
+			Ctor: fmt.Sprintf(`{"Args":["%s","%s"]}`, createdAddr, SimpleStorage.FunctionHashes["get"]),
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Eventually(sess, LongEventualTimeout).Should(gexec.Exit(0))
+		output, _ = sess.Command.CombinedOutput()
+		Expect(sess.Out).To(gbytes.Say("0000000000000000000000000000000000000000000000000000000000000005"))
 	})
+
 })
+
+func peerCLIAddressToHex(peerCLIAddress []byte) string {
+	createdAddr := ""
+	// Peer CLI interprets the bytes as ascii so they need to be converted back to hex
+	// for every back slash, the next 3 are octal that need to be converted to two digit hex
+	// if no slash, get ascii to two digit hex
+	for i := 0; i < len(peerCLIAddress); i++ {
+		switch fmt.Sprintf("%s", peerCLIAddress[i:i+1]) {
+		case `\`:
+			nextChar := string(peerCLIAddress[i+1 : i+2])
+			if _, err := strconv.Atoi(nextChar); err == nil {
+				result, _ := strconv.ParseInt(string(peerCLIAddress[i+1:i+4]), 8, 64)
+				hex := fmt.Sprintf("%x", result)
+				// Each Octal code needs to be represented by two digits
+				if len(hex) == 1 {
+					hex = "0" + hex
+				}
+				createdAddr += hex
+				i += 3 // loop will add one more too
+			} else {
+				switch nextChar {
+				case "n":
+					createdAddr += fmt.Sprintf("%x", "\n")
+				case "t":
+					createdAddr += fmt.Sprintf("%x", "\t")
+				case "r":
+					createdAddr += fmt.Sprintf("%x", "\r")
+				case "f":
+					createdAddr += fmt.Sprintf("%x", "\f")
+				case "v":
+					createdAddr += fmt.Sprintf("%x", "\v")
+				default:
+					// We only need the escaped character
+					createdAddr += fmt.Sprintf("%x", string(peerCLIAddress[i+1:i+2]))
+				}
+				i++
+			}
+		default:
+			createdAddr += fmt.Sprintf("%x", peerCLIAddress[i:i+1])
+		}
+	}
+
+	return createdAddr[len(createdAddr)-40:]
+}
