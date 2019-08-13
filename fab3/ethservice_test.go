@@ -1321,21 +1321,94 @@ var _ = Describe("Ethservice", func() {
 		})
 	})
 
-	Describe("NewFilter & UninstallFilter", func() {
-		It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
-			var reply string
-			var x types.GetLogsArgs
-			By("Installing a filter")
-			Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
-			_, err := strconv.ParseUint(reply, 0, 16)
-			Expect(err).ToNot(HaveOccurred())
-			var valid bool
-			By("using the returned ID to uninstall a filter")
-			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
-			Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
-			valid = false // reset to default value
-			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
-			Expect(valid).To(BeFalse(), "the filter has just now been removed")
+	FDescribe("Filtering", func() {
+		Context("NewFilter & UninstallFilter", func() {
+			It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
+				var reply string
+				var x types.GetLogsArgs
+				By("Installing a filter")
+				Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
+				id, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var valid bool
+				filter := types.FilterID{ID: id}
+				By("using the returned ID to uninstall a filter")
+				Expect(ethservice.UninstallFilter(&http.Request{}, &filter, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+				valid = false // reset to default value
+				Expect(ethservice.UninstallFilter(&http.Request{}, &filter, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeFalse(), "the filter has just now been removed")
+			})
+		})
+		Context("blockfilter", func() {
+			var (
+			//requestedBlockNumber string
+			)
+			BeforeEach(func() {
+				//requestedBlockNumber = "latest"
+				mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 1}}, nil)
+			})
+
+			It("have a consistent Filter ID between invocations of NewBlockFilter and UninstallFilter", func() {
+				var reply string
+				By("Installing a filter")
+				Expect(ethservice.NewBlockFilter(&http.Request{}, nil, &reply)).ToNot(HaveOccurred())
+				id, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var valid bool
+				filter := types.FilterID{ID: id}
+				By("using the returned ID to uninstall a filter")
+				Expect(ethservice.UninstallFilter(&http.Request{}, &filter, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+				valid = false // reset to default value
+				Expect(ethservice.UninstallFilter(&http.Request{}, &filter, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeFalse(), "the filter has just now been removed")
+			})
+
+			It("doesn't emit new blocks when there is no new block", func() {
+				var reply string
+				By("Installing a filter")
+				Expect(ethservice.NewBlockFilter(&http.Request{}, nil, &reply)).ToNot(HaveOccurred())
+				id, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var ret []interface{}
+
+				var filter types.FilterID
+				filter = types.FilterID{ID: id}
+				Expect(ethservice.GetFilterChanges(&http.Request{}, &filter, &ret)).ToNot(HaveOccurred())
+				logger.Debug(ret)
+				Expect(ret).To(BeEmpty())
+			})
+			It("emits the new block hash when there is a new block", func() {
+				var reply string
+				By("Installing a filter")
+				Expect(ethservice.NewBlockFilter(&http.Request{}, nil, &reply)).ToNot(HaveOccurred())
+				id, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var ret []interface{}
+
+				var filter types.FilterID
+				By("put some blocks into the chain")
+				mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 3}}, nil)
+				sampleBlock1 := GetSampleBlock(1)
+				sampleBlock2 := GetSampleBlock(2)
+				qbs := func(b uint64, _ ...ledger.RequestOption) (*common.Block, error) {
+					logger.Debug("mockblock", b)
+					if b == 1 {
+						return sampleBlock1, nil
+					} else if b == 2 {
+						return sampleBlock2, nil
+					} else {
+						return nil, fmt.Errorf("no block available for block number %d", b)
+					}
+				}
+				mockLedgerClient.QueryBlockStub = qbs
+
+				filter = types.FilterID{ID: id}
+				Expect(ethservice.GetFilterChanges(&http.Request{}, &filter, &ret)).ToNot(HaveOccurred())
+				Expect(ret).To(ContainElement("0x" + hex.EncodeToString(blockHash(sampleBlock1.GetHeader()))))
+				Expect(ret).To(ContainElement("0x" + hex.EncodeToString(blockHash(sampleBlock2.GetHeader()))))
+			})
 		})
 	})
 
