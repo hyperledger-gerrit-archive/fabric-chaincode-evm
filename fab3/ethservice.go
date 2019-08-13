@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
@@ -80,7 +81,11 @@ type EthService interface {
 	GetTransactionCount(r *http.Request, _ *interface{}, reply *string) error
 	GetLogs(*http.Request, *types.GetLogsArgs, *[]types.Log) error
 	NewFilter(*http.Request, *types.GetLogsArgs, *string) error
+	NewBlockFilter(*http.Request, *interface{}, *string) error
+	// NewPendingTransactionFilter (*http.Request, *types.GetLogsArgs, *string) error
 	UninstallFilter(*http.Request, *string, *bool) error
+	// GetFilterChanges (*http.Request, *string, *[]interface{}) error
+	// GetFilterLogs(*http.Request, *string, *bool) error
 }
 
 type ethService struct {
@@ -91,12 +96,60 @@ type ethService struct {
 	logger        *zap.SugaredLogger
 	// should we use sync.Map?
 	filterMapLock sync.Mutex
-	filterMap     map[uint64]interface{}
+	filterMap     map[uint64]filterEntry
 	filterSeq     uint64
 }
 
+
+type filterType int
+
+const (
+	logs filterType = iota
+	block
+	txns
+)
+
+func (ft filterType) filter() interface{} {
+	switch ft {
+	case logs:
+	case block:
+	case txns:
+	default:
+	}
+	return struct{}{}
+}
+
+type logsFilter struct {
+	lastAccessTime time.Time
+}
+
+func (f *logsFilter) LastAccessTime() time.Time {
+	return f.lastAccessTime
+}
+
+type newBlockFilter struct {
+	latestBlockSeen uint64
+	lastAccessTime  time.Time
+}
+
+func (f *newBlockFilter) LastAccessTime() time.Time {
+	return f.lastAccessTime
+}
+
+type filterEntry interface {
+	ExpiringFilter
+	// filterType
+	// logsFilter
+	// block
+	// txnsFilter
+}
+
+type ExpiringFilter interface {
+	LastAccessTime() time.Time
+}
+
 func NewEthService(channelClient ChannelClient, ledgerClient LedgerClient, channelID string, ccid string, logger *zap.SugaredLogger) EthService {
-	return &ethService{channelClient: channelClient, ledgerClient: ledgerClient, channelID: channelID, ccid: ccid, logger: logger.Named("ethservice"), filterMap: make(map[uint64]interface{})}
+	return &ethService{channelClient: channelClient, ledgerClient: ledgerClient, channelID: channelID, ccid: ccid, logger: logger.Named("ethservice"), filterMap: make(map[uint64]filterEntry)}
 }
 
 func (s *ethService) GetCode(r *http.Request, arg *string, reply *string) error {
@@ -520,7 +573,23 @@ func (s *ethService) NewFilter(_ *http.Request, filter *types.GetLogsArgs, resul
 	s.filterMapLock.Lock()
 	s.filterSeq++
 	index := s.filterSeq
-	s.filterMap[index] = filter
+	s.filterMap[index] = &logsFilter{lastAccessTime: time.Now()}
+	s.filterMapLock.Unlock()
+	*result = "0x" + strconv.FormatUint(index, 16)
+	return nil
+}
+
+func (s *ethService) NewBlockFilter(_ *http.Request, _ *interface{}, result *string) error {
+	latestExistingBlock, err := s.parseBlockNum("latest")
+	if err != nil {
+		return errors.Wrap(err, "latest block number not available at this time")
+	}
+
+	s.filterMapLock.Lock()
+	s.filterSeq++
+	index := s.filterSeq
+
+	s.filterMap[index] = &newBlockFilter{latestBlockSeen: latestExistingBlock, lastAccessTime: time.Now()}
 	s.filterMapLock.Unlock()
 	*result = "0x" + strconv.FormatUint(index, 16)
 	return nil

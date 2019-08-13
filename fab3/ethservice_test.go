@@ -1321,21 +1321,54 @@ var _ = Describe("Ethservice", func() {
 		})
 	})
 
-	Describe("NewFilter & UninstallFilter", func() {
-		It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
-			var reply string
-			var x types.GetLogsArgs
-			By("Installing a filter")
-			Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
-			_, err := strconv.ParseUint(reply, 0, 16)
-			Expect(err).ToNot(HaveOccurred())
-			var valid bool
-			By("using the returned ID to uninstall a filter")
-			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
-			Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
-			valid = false // reset to default value
-			Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
-			Expect(valid).To(BeFalse(), "the filter has just now been removed")
+	Describe("Filtering", func() {
+		Context("NewFilter & UninstallFilter", func() {
+			It("have a consistent Filter ID between invocations of NewFilter and UninstallFilter", func() {
+				var reply string
+				var x types.GetLogsArgs
+				By("Installing a filter")
+				Expect(ethservice.NewFilter(&http.Request{}, &x, &reply)).ToNot(HaveOccurred())
+				_, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var valid bool
+				By("using the returned ID to uninstall a filter")
+				Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+				valid = false // reset to default value
+				Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeFalse(), "the filter has just now been removed")
+			})
+		})
+		Context("blockfilter", func() {
+			var (
+			//requestedBlockNumber string
+			)
+			BeforeEach(func() {
+				//requestedBlockNumber = "latest"
+				mockLedgerClient.QueryInfoReturns(&fab.BlockchainInfoResponse{BCI: &common.BlockchainInfo{Height: 1}}, nil)
+			})
+
+			It("have a consistent Filter ID between invocations of NewBlockFilter and UninstallFilter", func() {
+				var reply string
+				By("Installing a filter")
+				Expect(ethservice.NewBlockFilter(&http.Request{}, nil, &reply)).ToNot(HaveOccurred())
+				_, err := strconv.ParseUint(reply, 0, 16)
+				Expect(err).ToNot(HaveOccurred())
+				var valid bool
+				By("using the returned ID to uninstall a filter")
+				Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeTrue(), "this is the filterID we were given by NewFilter")
+				valid = false // reset to default value
+				Expect(ethservice.UninstallFilter(&http.Request{}, &reply, &valid)).ToNot(HaveOccurred())
+				Expect(valid).To(BeFalse(), "the filter has just now been removed")
+			})
+
+			It("doesn't emit new blocks when there is no new block", func() {
+
+			})
+			It("emits a new block when there is a new block", func() {
+
+			})
 		})
 	})
 

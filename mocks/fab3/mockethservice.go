@@ -153,6 +153,19 @@ type MockEthService struct {
 	getTransactionReceiptReturnsOnCall map[int]struct {
 		result1 error
 	}
+	NewBlockFilterStub        func(*http.Request, *interface{}, *string) error
+	newBlockFilterMutex       sync.RWMutex
+	newBlockFilterArgsForCall []struct {
+		arg1 *http.Request
+		arg2 *interface{}
+		arg3 *string
+	}
+	newBlockFilterReturns struct {
+		result1 error
+	}
+	newBlockFilterReturnsOnCall map[int]struct {
+		result1 error
+	}
 	NewFilterStub        func(*http.Request, *types.GetLogsArgs, *string) error
 	newFilterMutex       sync.RWMutex
 	newFilterArgsForCall []struct {
@@ -768,6 +781,58 @@ func (fake *MockEthService) GetTransactionReceiptReturnsOnCall(i int, result1 er
 	}{result1}
 }
 
+func (fake *MockEthService) NewBlockFilter(arg1 *http.Request, arg2 *interface{}, arg3 *string) error {
+	fake.newBlockFilterMutex.Lock()
+	ret, specificReturn := fake.newBlockFilterReturnsOnCall[len(fake.newBlockFilterArgsForCall)]
+	fake.newBlockFilterArgsForCall = append(fake.newBlockFilterArgsForCall, struct {
+		arg1 *http.Request
+		arg2 *interface{}
+		arg3 *string
+	}{arg1, arg2, arg3})
+	fake.recordInvocation("NewBlockFilter", []interface{}{arg1, arg2, arg3})
+	fake.newBlockFilterMutex.Unlock()
+	if fake.NewBlockFilterStub != nil {
+		return fake.NewBlockFilterStub(arg1, arg2, arg3)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	fakeReturns := fake.newBlockFilterReturns
+	return fakeReturns.result1
+}
+
+func (fake *MockEthService) NewBlockFilterCallCount() int {
+	fake.newBlockFilterMutex.RLock()
+	defer fake.newBlockFilterMutex.RUnlock()
+	return len(fake.newBlockFilterArgsForCall)
+}
+
+func (fake *MockEthService) NewBlockFilterArgsForCall(i int) (*http.Request, *interface{}, *string) {
+	fake.newBlockFilterMutex.RLock()
+	defer fake.newBlockFilterMutex.RUnlock()
+	argsForCall := fake.newBlockFilterArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+}
+
+func (fake *MockEthService) NewBlockFilterReturns(result1 error) {
+	fake.NewBlockFilterStub = nil
+	fake.newBlockFilterReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *MockEthService) NewBlockFilterReturnsOnCall(i int, result1 error) {
+	fake.NewBlockFilterStub = nil
+	if fake.newBlockFilterReturnsOnCall == nil {
+		fake.newBlockFilterReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.newBlockFilterReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
 func (fake *MockEthService) NewFilter(arg1 *http.Request, arg2 *types.GetLogsArgs, arg3 *string) error {
 	fake.newFilterMutex.Lock()
 	ret, specificReturn := fake.newFilterReturnsOnCall[len(fake.newFilterArgsForCall)]
@@ -949,6 +1014,8 @@ func (fake *MockEthService) Invocations() map[string][][]interface{} {
 	defer fake.getTransactionCountMutex.RUnlock()
 	fake.getTransactionReceiptMutex.RLock()
 	defer fake.getTransactionReceiptMutex.RUnlock()
+	fake.newBlockFilterMutex.RLock()
+	defer fake.newBlockFilterMutex.RUnlock()
 	fake.newFilterMutex.RLock()
 	defer fake.newFilterMutex.RUnlock()
 	fake.sendTransactionMutex.RLock()
