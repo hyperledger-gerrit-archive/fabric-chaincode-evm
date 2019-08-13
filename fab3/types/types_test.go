@@ -232,3 +232,13 @@ var _ = Describe("GetLogsArgs UnmarshalJSON", func() {
 			[]byte(`{"number":"", "parentHash":"", "hash":"", "transactions":["0x12345678"]}`)),
 	)
 })
+
+var _ = Describe("FilterID UnmarshalJSON", func() {
+	It("takes the right stuff", func() {
+		var expected FilterID
+		bytes := []byte(`"0x16"`)
+		err := json.Unmarshal(bytes, &expected)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(expected.ID).To(Equal(uint64(22)))
+	})
+})
