@@ -26,6 +26,11 @@ Fab3 currently supports:
 - [eth_getTransactionReceipt](#eth_getTransactionReceipt)
 - [eth_getLogs](#eth_getLogs)
 - [eth_getTransactionCount](#eth_getTransactionCount)
+- [eth_NewFilter](#eth_NewFilter)
+- [eth_NewBlockFilter](#eth_NewBlockFilter)
+- [eth_UninstallFilter](#eth_UninstallFilter)
+- [eth_getFilterChanges](#eth_getFilterChanges)
+- [eth_getFilterLogs](#eth_getFilterLogs)
 
 
 ### net_version
@@ -359,6 +364,76 @@ ignored.
 
 **Example**
 ```
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getTransactionCount",
+  "id":1,
+  "params":[]
+}'
+
+{"jsonrpc":"2.0","result":"0x0","id":1}
+```
+
+### eth_NewFilter
+
+**Example**
+```console
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getTransactionCount",
+  "id":1,
+  "params":[]
+}'
+
+{"jsonrpc":"2.0","result":"0x0","id":1}
+```
+
+### eth_NewBlockFilter
+
+**Example**
+```console
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getTransactionCount",
+  "id":1,
+  "params":[]
+}'
+
+{"jsonrpc":"2.0","result":"0x0","id":1}
+```
+
+### eth_UninstallFilter
+
+**Example**
+```console
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getTransactionCount",
+  "id":1,
+  "params":[]
+}'
+
+{"jsonrpc":"2.0","result":"0x0","id":1}
+```
+
+### eth_getFilterChanges
+
+**Example**
+```console
+curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
+  "jsonrpc":"2.0",
+  "method": "eth_getTransactionCount",
+  "id":1,
+  "params":[]
+}'
+
+{"jsonrpc":"2.0","result":"0x0","id":1}
+```
+
+### eth_getFilterLogs
+
+**Example**
+```console
 curl http://127.0.0.1:5000 -X POST -H "Content-Type:application/json" -d '{
   "jsonrpc":"2.0",
   "method": "eth_getTransactionCount",
