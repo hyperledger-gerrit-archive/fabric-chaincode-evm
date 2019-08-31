@@ -13,6 +13,14 @@
   revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
 
 [[projects]]
+  digest = "1:5d3e23515e7916c152cc665eda0f7eaf6fdf8fdfe7c3dbac97049bcbd649b33f"
+  name = "github.com/Knetic/govaluate"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "d216395917cc49052c7c7094cf57f09657ca08a8"
+  version = "v3.0.0"
+
+[[projects]]
   digest = "1:4179c92d452daa1e0693fd12e094d9b05a1ecb79efcded05c7dae15e539b9f0b"
   name = "github.com/Microsoft/go-winio"
   packages = ["."]
@@ -156,7 +164,7 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:278bc423e38c3a969b6757f1c0af369ecf930b534a58fddde76f5191ec969a25"
+  digest = "1:a221da831c525206ed8f62ef1b2b34a5263e49f8c54fd29ce4a34e6b01b6a199"
   name = "github.com/go-kit/kit"
   packages = [
     "log",
@@ -170,8 +178,8 @@
     "util/conn",
   ]
   pruneopts = "UT"
-  revision = "12210fb6ace19e0496167bb3e667dcd91fa9f69b"
-  version = "v0.8.0"
+  revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
+  version = "v0.6.0"
 
 [[projects]]
   digest = "1:31a18dae27a29aa074515e43a443abfd2ba6deb6d69309d8d7ce789c45f34659"
@@ -180,6 +188,14 @@
   pruneopts = "UT"
   revision = "390ab7935ee28ec6b286364bba9b4dd6410cb3d5"
   version = "v0.3.0"
+
+[[projects]]
+  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
 
 [[projects]]
   digest = "1:35621fe20f140f05a0c4ef662c26c0ab4ee50bca78aa30fe87d33120bd28165e"
@@ -205,19 +221,21 @@
   revision = "73dc87cad333b55a02058f4b3d872dbbafddc2b0"
 
 [[projects]]
-  digest = "1:0a6478c37f24385424d457d8f2d921dc9ff84156e021fe86c5cabe263db64930"
+  digest = "1:446087426544b2470148ef69a5b5e497255f327cadfb3632c161706a2db0bd63"
   name = "github.com/golang/protobuf"
   packages = [
+    "jsonpb",
     "proto",
     "ptypes",
     "ptypes/any",
     "ptypes/duration",
     "ptypes/empty",
+    "ptypes/struct",
     "ptypes/timestamp",
   ]
   pruneopts = "UT"
-  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
-  version = "v1.1.0"
+  revision = "6c65a5562fc06764971b7c5d05c76c75e84bdbf7"
+  version = "v1.3.2"
 
 [[projects]]
   digest = "1:fabe4bb8fadac9fd769267f14316ed84a86cd49e722c5e65f4881ae0082bf76f"
@@ -396,11 +414,29 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:ec7757d9a15cd30896008499c952ebc0b39e6276c7a2b99281aec929c311c0cf"
+  digest = "1:a62166556518bd036bffed6657bf5a8eff1f40963cf77a37c968f4b97f3ab53c"
+  name = "github.com/hyperledger/fabric-protos-go"
+  packages = [
+    "common",
+    "discovery",
+    "gossip",
+    "ledger/rwset",
+    "ledger/rwset/kvrwset",
+    "msp",
+    "orderer",
+    "orderer/etcdraft",
+    "peer",
+  ]
+  pruneopts = "UT"
+  revision = "26c33c998676be969a8e0f4824defb3ee90a3d05"
+
+[[projects]]
+  digest = "1:18582c4c3e5dc6963e7072e43d10e453a86079b3f52527aeb0c3f938362a7817"
   name = "github.com/hyperledger/fabric-sdk-go"
   packages = [
     "internal/github.com/hyperledger/fabric-ca/api",
     "internal/github.com/hyperledger/fabric-ca/lib",
+    "internal/github.com/hyperledger/fabric-ca/lib/attrmgr",
     "internal/github.com/hyperledger/fabric-ca/lib/client/credential",
     "internal/github.com/hyperledger/fabric-ca/lib/client/credential/x509",
     "internal/github.com/hyperledger/fabric-ca/lib/common",
@@ -414,27 +450,43 @@
     "internal/github.com/hyperledger/fabric/bccsp/signer",
     "internal/github.com/hyperledger/fabric/bccsp/sw",
     "internal/github.com/hyperledger/fabric/bccsp/utils",
-    "internal/github.com/hyperledger/fabric/common/attrmgr",
+    "internal/github.com/hyperledger/fabric/common/capabilities",
+    "internal/github.com/hyperledger/fabric/common/cauthdsl",
     "internal/github.com/hyperledger/fabric/common/channelconfig",
+    "internal/github.com/hyperledger/fabric/common/configtx",
     "internal/github.com/hyperledger/fabric/common/crypto",
-    "internal/github.com/hyperledger/fabric/common/ledger",
+    "internal/github.com/hyperledger/fabric/common/genesis",
     "internal/github.com/hyperledger/fabric/common/metrics",
     "internal/github.com/hyperledger/fabric/common/metrics/disabled",
     "internal/github.com/hyperledger/fabric/common/metrics/internal/namer",
     "internal/github.com/hyperledger/fabric/common/metrics/prometheus",
     "internal/github.com/hyperledger/fabric/common/metrics/statsd",
     "internal/github.com/hyperledger/fabric/common/metrics/statsd/goruntime",
+    "internal/github.com/hyperledger/fabric/common/policies",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext/commonext",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext/ledger/rwsetext",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext/mspext",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext/ordererext",
+    "internal/github.com/hyperledger/fabric/common/tools/protolator/protoext/peerext",
     "internal/github.com/hyperledger/fabric/common/util",
     "internal/github.com/hyperledger/fabric/core/comm",
-    "internal/github.com/hyperledger/fabric/core/common/privdata",
-    "internal/github.com/hyperledger/fabric/core/ledger",
+    "internal/github.com/hyperledger/fabric/core/common/ccprovider",
+    "internal/github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil",
+    "internal/github.com/hyperledger/fabric/core/ledger/util",
     "internal/github.com/hyperledger/fabric/core/middleware",
     "internal/github.com/hyperledger/fabric/core/operations",
     "internal/github.com/hyperledger/fabric/discovery/client",
+    "internal/github.com/hyperledger/fabric/discovery/protoext",
+    "internal/github.com/hyperledger/fabric/gossip/protoext",
     "internal/github.com/hyperledger/fabric/msp",
-    "internal/github.com/hyperledger/fabric/protos/discovery",
-    "internal/github.com/hyperledger/fabric/protos/gossip",
-    "internal/github.com/hyperledger/fabric/protos/orderer",
+    "internal/github.com/hyperledger/fabric/msp/cache",
+    "internal/github.com/hyperledger/fabric/protoutil",
+    "internal/github.com/hyperledger/fabric/sdkinternal/configtxgen/encoder",
+    "internal/github.com/hyperledger/fabric/sdkinternal/configtxgen/localconfig",
+    "internal/github.com/hyperledger/fabric/sdkinternal/configtxlator/update",
+    "internal/github.com/hyperledger/fabric/sdkinternal/pkg/identity",
     "internal/github.com/hyperledger/fabric/sdkpatch/cryptosuitebridge",
     "internal/github.com/hyperledger/fabric/sdkpatch/logbridge",
     "internal/github.com/hyperledger/fabric/sdkpatch/logbridge/httpadmin",
@@ -507,6 +559,7 @@
     "pkg/fab/orderer",
     "pkg/fab/peer",
     "pkg/fab/resource",
+    "pkg/fab/resource/genesisconfig",
     "pkg/fab/signingmgr",
     "pkg/fab/txn",
     "pkg/fabsdk",
@@ -529,21 +582,9 @@
     "pkg/util/pathvar",
     "pkg/util/test",
     "test/metadata",
-    "third_party/github.com/hyperledger/fabric/core/common/ccprovider",
-    "third_party/github.com/hyperledger/fabric/core/ledger/kvledger/txmgmt/rwsetutil",
-    "third_party/github.com/hyperledger/fabric/core/ledger/util",
-    "third_party/github.com/hyperledger/fabric/protos/common",
-    "third_party/github.com/hyperledger/fabric/protos/ledger/rwset",
-    "third_party/github.com/hyperledger/fabric/protos/ledger/rwset/kvrwset",
-    "third_party/github.com/hyperledger/fabric/protos/msp",
-    "third_party/github.com/hyperledger/fabric/protos/orderer",
-    "third_party/github.com/hyperledger/fabric/protos/peer",
-    "third_party/github.com/hyperledger/fabric/protos/token",
-    "third_party/github.com/hyperledger/fabric/protos/utils",
   ]
   pruneopts = "UT"
-  revision = "0e710cebffe5674d411a625bc103ff0e266bb5e1"
-  version = "v1.0.0-alpha5"
+  revision = "6c3f788a32f8b20dc4f41fc60cebdc94309be354"
 
 [[projects]]
   digest = "1:870d441fe217b8e689d7949fef6e43efbc787e50f200cb1e70dbca9204a1d6be"
@@ -687,12 +728,12 @@
   version = "v1.2.0"
 
 [[projects]]
-  digest = "1:40e195917a951a8bf867cd05de2a46aaf1806c50cf92eebf4c16f78cd196f747"
+  digest = "1:cf31692c14422fa27c83a05292eb5cbe0fb2775972e8f1f8446a71549bd8980b"
   name = "github.com/pkg/errors"
   packages = ["."]
   pruneopts = "UT"
-  revision = "645ef00459ed84a119197bfb8d8205042c6df63d"
-  version = "v0.8.0"
+  revision = "ba968bfe8b2f7e042a574c888954fccecfa385b4"
+  version = "v0.8.1"
 
 [[projects]]
   digest = "1:0028cb19b2e4c3112225cd871870f2d9cf49b9b4276531f03438a88e94be86fe"
@@ -703,11 +744,12 @@
   version = "v1.0.0"
 
 [[projects]]
-  digest = "1:75d51eeab0df85a3cea9e1297ccd3183b20a10cb4b48c753d8ec8d113cc14250"
+  digest = "1:93a746f1060a8acbcf69344862b2ceced80f854170e1caae089b2834c5fbf7f4"
   name = "github.com/prometheus/client_golang"
   packages = [
     "prometheus",
     "prometheus/internal",
+    "prometheus/promhttp",
   ]
   pruneopts = "UT"
   revision = "505eaef017263e299324067d40ca2c48f6a2cf50"
@@ -998,24 +1040,30 @@
   revision = "df60624c1e9b9d2973e889c7a1cff73155da81c4"
 
 [[projects]]
-  digest = "1:ab8e92d746fb5c4c18846b0879842ac8e53b3d352449423d0924a11f1020ae1b"
+  digest = "1:3b97661db2e5d4c87f7345e875ea28f911e54c715ba0a74be08e1649d67e05cd"
   name = "google.golang.org/grpc"
   packages = [
     ".",
     "balancer",
     "balancer/base",
     "balancer/roundrobin",
+    "binarylog/grpc_binarylog_v1",
     "codes",
     "connectivity",
     "credentials",
+    "credentials/internal",
     "encoding",
     "encoding/proto",
     "grpclog",
     "internal",
     "internal/backoff",
+    "internal/balancerload",
+    "internal/binarylog",
     "internal/channelz",
     "internal/envconfig",
     "internal/grpcrand",
+    "internal/grpcsync",
+    "internal/syscall",
     "internal/transport",
     "keepalive",
     "metadata",
@@ -1024,13 +1072,14 @@
     "resolver",
     "resolver/dns",
     "resolver/passthrough",
+    "serviceconfig",
     "stats",
     "status",
     "tap",
   ]
   pruneopts = "UT"
-  revision = "8dea3dc473e90c8179e519d91302d0597c0ca1d1"
-  version = "v1.15.0"
+  revision = "6eaf6f47437a6b4e2153a190160ef39a92c7eceb"
+  version = "v1.23.0"
 
 [[projects]]
   digest = "1:342378ac4dcb378a5448dd723f0784ae519383532f5e70ade24132c4c8693202"
@@ -1060,13 +1109,13 @@
     "github.com/hyperledger/burrow/execution/exec",
     "github.com/hyperledger/burrow/logging",
     "github.com/hyperledger/burrow/permission",
+    "github.com/hyperledger/fabric-protos-go/common",
+    "github.com/hyperledger/fabric-protos-go/peer",
     "github.com/hyperledger/fabric-sdk-go/pkg/client/channel",
     "github.com/hyperledger/fabric-sdk-go/pkg/client/ledger",
     "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab",
     "github.com/hyperledger/fabric-sdk-go/pkg/core/config",
     "github.com/hyperledger/fabric-sdk-go/pkg/fabsdk",
-    "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common",
-    "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/peer",
     "github.com/hyperledger/fabric/common/flogging",
     "github.com/hyperledger/fabric/core/chaincode/shim",
     "github.com/hyperledger/fabric/integration/nwo",

@@ -5,9 +5,9 @@ import (
 	sync "sync"
 
 	fab3 "github.com/hyperledger/fabric-chaincode-evm/fab3"
+	common "github.com/hyperledger/fabric-protos-go/common"
 	ledger "github.com/hyperledger/fabric-sdk-go/pkg/client/ledger"
 	fab "github.com/hyperledger/fabric-sdk-go/pkg/common/providers/fab"
-	common "github.com/hyperledger/fabric-sdk-go/third_party/github.com/hyperledger/fabric/protos/common"
 )
 
 type MockLedgerClient struct {

@@ -14,7 +14,7 @@ noverify = [
   name = "github.com/hyperledger/fabric"
 
 [[constraint]]
-  version = "1.0.0-alpha5"
+  revision = "6c3f788a32f8b20dc4f41fc60cebdc94309be354"
   name = "github.com/hyperledger/fabric-sdk-go"
 
 [[constraint]]
@@ -43,7 +43,7 @@ noverify = [
   revision = "19279f0492417475b6bfbd0aa529f73e8f178fb5"
 
 [[override]]
-  version = "0.8.0"
+  version = "0.8.1"
   name = "github.com/pkg/errors"
 
 [[override]]
@@ -51,7 +51,7 @@ noverify = [
   name = "google.golang.org/genproto"
 
 [[override]]
-  version = "1.1.0"
+  version = "1.3.2"
   name = "github.com/golang/protobuf"
 
 [[override]]
@@ -64,7 +64,7 @@ noverify = [
 
 #Fabric 1.4 requires 1.15.0 and Burrow 0.24.4 requires 1.19.0
 [[override]]
-  version = "1.15.0"
+  version = "1.23.0"
   name = "google.golang.org/grpc"
 
 #Constraints from Burrow
@@ -106,3 +106,7 @@ noverify = [
       name = "github.com/onsi/gomega"
       unused-packages = false
       non-go = true
+
+[[override]]
+  revision = "26c33c998676be969a8e0f4824defb3ee90a3d05"
+  name = "github.com/hyperledger/fabric-protos-go"
