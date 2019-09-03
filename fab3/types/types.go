@@ -243,6 +243,7 @@ type BlockData struct {
 	Number     string `json:"number"`     // number: QUANTITY - the block number. null when its pending block.
 	Hash       string `json:"hash"`       // hash: DATA, 32 Bytes - hash of the block. null when its pending block.
 	ParentHash string `json:"parentHash"` // parentHash: DATA, 32 Bytes - hash of the parent block.
+	GasLimit   string `json:"gasLimit"`   // gasLimit: QUANTITY - the maximum gas allowed in this block.
 }
 
 // MarshalJSON marshals the data differently based on whether
@@ -269,6 +270,7 @@ func (blk *Block) MarshalJSON() ([]byte, error) {
 			Number:     blk.Number,
 			Hash:       blk.Hash,
 			ParentHash: blk.ParentHash,
+			GasLimit:   "0x0",
 		},
 		Transactions: txns,
 	}

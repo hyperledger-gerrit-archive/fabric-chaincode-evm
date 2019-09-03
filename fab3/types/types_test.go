@@ -224,7 +224,7 @@ var _ = Describe("GetLogsArgs UnmarshalJSON", func() {
 		Entry("block with full transactions",
 			Block{
 				Transactions: []interface{}{Transaction{}}},
-			[]byte(`{"number":"", "parentHash":"", "hash":"", "transactions":[{"blockHash":"", "blockNumber":"", "to":"", "from":"", "input":"","transactionIndex":"", "hash":"", "gasPrice":"0x0", "value":"0x0"}]}`)),
+			[]byte(`{"number":"", "parentHash":"", "hash":"", "gasLimit":"0x0", "transactions":[{"blockHash":"", "blockNumber":"", "to":"", "from":"", "input":"","transactionIndex":"", "hash":"", "gasPrice":"0x0", "value":"0x0"}]}`)),
 
 		Entry("block with not full transactions",
 			Block{
