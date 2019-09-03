@@ -57,6 +57,7 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 	// Address associated with the above cert
 	addrFromCert = "0xb3778bcee2b9c349702e5832928730d2aed0ac07"
 )
+
 var _ = Describe("Ethservice", func() {
 	var (
 		ethservice fab3.EthService
@@ -1415,7 +1416,7 @@ func GetSampleBlockWithTransaction(blockNumber uint64, blkHash []byte, txns ...*
 		Expect(err).ToNot(HaveOccurred())
 
 		blockData = append(blockData, txn)
-		transactionsFilter = append(transactionsFilter, '0')
+		transactionsFilter = append(transactionsFilter, 0)
 	}
 
 	blockMetadata[common.BlockMetadataIndex_TRANSACTIONS_FILTER] = transactionsFilter
