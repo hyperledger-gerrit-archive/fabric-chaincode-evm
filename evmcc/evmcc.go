@@ -45,7 +45,9 @@ func (evmcc *EvmChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 }
 
 func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
-	// We always expect 2 args: 'callee address, input data' or ' getCode ,  contract address'
+	// 1 args: 'account'
+	// 2 args: 'callee address, input data' or ' getCode ,  contract address'
+	// 3 args: 'callee address, input data, caller address'
 	args := stub.GetArgs()
 
 	if len(args) == 1 {
@@ -54,8 +56,8 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 		}
 	}
 
-	if len(args) != 2 {
-		return shim.Error(fmt.Sprintf("expects 2 args, got %d : %s", len(args), string(args[0])))
+	if len(args) != 2 && len(args) != 3 {
+		return shim.Error(fmt.Sprintf("expects 2 or 3 args, got %d : %s", len(args), string(args[0])))
 	}
 
 	if string(args[0]) == "getCode" {
@@ -72,10 +74,22 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 		return shim.Error(fmt.Sprintf("failed to get callee address: %s", err))
 	}
 
-	// get caller account from creator public key
-	callerAddr, err := getCallerAddress(stub)
-	if err != nil {
-		return shim.Error(fmt.Sprintf("failed to get caller address: %s", err))
+	var callerAddr crypto.Address
+	if len(args) == 2 {
+		// get caller account from creator public key
+		callerAddr, err = getCallerAddress(stub)
+		if err != nil {
+			return shim.Error(fmt.Sprintf("failed to get caller address: %s", err))
+		}
+	} else {
+		c, err = hex.DecodeString(string(args[2]))
+		if err != nil {
+			return shim.Error(fmt.Sprintf("failed to decode caller address from %s: %s", string(args[3]), err))
+		}
+		callerAddr, err = crypto.AddressFromBytes(c)
+		if err != nil {
+			return shim.Error(fmt.Sprintf("failed to get caller address: %s", err))
+		}
 	}
 
 	// get input bytes from args[1]
@@ -150,11 +164,13 @@ func (evmcc *EvmChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response 
 			return shim.Error(fmt.Sprintf("failed to execute contract: %s", evmErr))
 		}
 
-		// Passing the function hash of the method that has triggered the event
-		// The function hash is the first 8 bytes of the Input argument
-		err := eventSink.Flush(string(args[1][0:8]))
-		if err != nil {
-			return shim.Error(fmt.Sprintf("error in Flush: %s", err))
+		if len(args[1]) >= 8 {
+			// Passing the function hash of the method that has triggered the event
+			// The function hash is the first 8 bytes of the Input argument
+			err := eventSink.Flush(string(args[1][0:8]))
+			if err != nil {
+				return shim.Error(fmt.Sprintf("error in Flush: %s", err))
+			}
 		}
 
 		// Sync is required for evm to send writes to the statemanager.
