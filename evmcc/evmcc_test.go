@@ -191,15 +191,52 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 
 		})
 
-		Context("when more than 2 args are given", func() {
+		Context("when 3 args are given", func() {
+			It("can deploy contract and run the methods of the contract with the given caller address", func() {
+				By("deploy contract")
+
+				var (
+					contractAddress crypto.Address
+					SET             = "60fe47b1"
+					GET             = "6d4ce63c"
+					callerAddress   = []byte("17da6a8b86578cec4525945a355e8384025fa5af")
+				)
+
+				stub.GetArgsReturns([][]byte{[]byte(crypto.ZeroAddress.String()), deployCode, callerAddress})
+				res := evmcc.Invoke(stub)
+				Expect(res.Status).To(Equal(int32(shim.OK)))
+
+				var err error
+				contractAddress, err = crypto.AddressFromHexString(string(res.Payload))
+				Expect(err).ToNot(HaveOccurred())
+
+				By("run the methods")
+
+				stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(GET), callerAddress})
+				res = evmcc.Invoke(stub)
+				Expect(res.Status).To(Equal(int32(shim.OK)))
+				Expect(hex.EncodeToString(res.Payload)).To(Equal("0000000000000000000000000000000000000000000000000000000000000000"))
+
+				stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(SET + "000000000000000000000000000000000000000000000000000000000000002a"), callerAddress})
+				res = evmcc.Invoke(stub)
+				Expect(res.Status).To(Equal(int32(shim.OK)))
+
+				stub.GetArgsReturns([][]byte{[]byte(contractAddress.String()), []byte(GET), callerAddress})
+				res = evmcc.Invoke(stub)
+				Expect(res.Status).To(Equal(int32(shim.OK)))
+				Expect(hex.EncodeToString(res.Payload)).To(Equal("000000000000000000000000000000000000000000000000000000000000002a"))
+			})
+		})
+
+		Context("when more than 3 args are given", func() {
 			BeforeEach(func() {
-				stub.GetArgsReturns([][]byte{[]byte("arg1"), []byte("arg2"), []byte("arg3")})
+				stub.GetArgsReturns([][]byte{[]byte("arg1"), []byte("arg2"), []byte("arg3"), []byte("arg4")})
 			})
 
 			It("returns an error", func() {
 				res := evmcc.Invoke(stub)
 				Expect(res.Status).To(Equal(int32(shim.ERROR)))
-				Expect(res.Message).To(ContainSubstring("expects 2 args"))
+				Expect(res.Message).To(ContainSubstring("expects 2 or 3 args"))
 			})
 		})
 
@@ -233,7 +270,7 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 					It("returns an error", func() {
 						res := evmcc.Invoke(stub)
 						Expect(res.Status).To(Equal(int32(shim.ERROR)))
-						Expect(res.Message).To(ContainSubstring("expects 2 args"))
+						Expect(res.Message).To(ContainSubstring("expects 2 or 3 args"))
 					})
 				})
 			})
@@ -246,7 +283,7 @@ AiEA0GxTPOXVHo0gJpMbHc9B73TL5ZfDhujoDyjb8DToWPQ=
 				It("returns an error", func() {
 					res := evmcc.Invoke(stub)
 					Expect(res.Status).To(Equal(int32(shim.ERROR)))
-					Expect(res.Message).To(ContainSubstring("expects 2 args"))
+					Expect(res.Message).To(ContainSubstring("expects 2 or 3 args"))
 				})
 			})
 		})

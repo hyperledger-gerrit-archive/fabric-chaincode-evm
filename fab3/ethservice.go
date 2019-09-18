@@ -119,6 +119,32 @@ func (s *ethService) Call(r *http.Request, args *types.EthArgs, reply *string) e
 	return nil
 }
 
+func (s *ethService) SendRawTransaction(r *http.Request, raw *string, reply *string) error {
+	var tx types.SignedTx
+	b, _ := hex.DecodeString(strip0x(*raw))
+	err := tx.Decode(b)
+	if err != nil {
+		return fmt.Errorf("Failed to decode raw transaction: %s", err)
+	}
+
+	to := tx.CalleeAddress()
+	from := tx.CallerAddress()
+	if to == "" {
+		to = hex.EncodeToString(ZeroAddress)
+	}
+	response, err := s.channelClient.Execute(channel.Request{
+		ChaincodeID: s.ccid,
+		Fcn:         strip0x(to),
+		Args:        [][]byte{[]byte(hex.EncodeToString(tx.Payload)), []byte(strip0x(from))},
+	})
+
+	if err != nil {
+		return fmt.Errorf("Failed to execute transaction: %s", err)
+	}
+	*reply = string(response.TransactionID)
+	return nil
+}
+
 func (s *ethService) SendTransaction(r *http.Request, args *types.EthArgs, reply *string) error {
 	if args.To == "" {
 		args.To = hex.EncodeToString(ZeroAddress)
@@ -622,9 +648,17 @@ func getTransactionInformation(payload *common.Payload) (string, string, string,
 		return "", "", "", nil, fmt.Errorf("Failed unmarshaling signature header: %s", err)
 	}
 
-	from, err := address.IdentityToAddr(sigHdr.GetCreator())
-	if err != nil {
-		return "", "", "", nil, fmt.Errorf("Failed generating from address: %s", err)
+	var from []byte
+	if len(args) == 2 {
+		from, err = address.IdentityToAddr(sigHdr.GetCreator())
+		if err != nil {
+			return "", "", "", nil, fmt.Errorf("Failed generating from address: %s", err)
+		}
+	} else if len(args) == 3 {
+		from, err = hex.DecodeString(string(args[2]))
+		if err != nil {
+			return "", "", "", nil, fmt.Errorf("Failed decoding address from args: %s", err)
+		}
 	}
 
 	// At this point, this is either an EVM Contract Deploy,
