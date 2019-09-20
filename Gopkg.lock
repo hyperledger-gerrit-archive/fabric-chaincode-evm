@@ -156,7 +156,7 @@
   version = "v1.3.0"
 
 [[projects]]
-  digest = "1:278bc423e38c3a969b6757f1c0af369ecf930b534a58fddde76f5191ec969a25"
+  digest = "1:a221da831c525206ed8f62ef1b2b34a5263e49f8c54fd29ce4a34e6b01b6a199"
   name = "github.com/go-kit/kit"
   packages = [
     "log",
@@ -170,8 +170,8 @@
     "util/conn",
   ]
   pruneopts = "UT"
-  revision = "12210fb6ace19e0496167bb3e667dcd91fa9f69b"
-  version = "v0.8.0"
+  revision = "4dc7be5d2d12881735283bcab7352178e190fc71"
+  version = "v0.6.0"
 
 [[projects]]
   digest = "1:31a18dae27a29aa074515e43a443abfd2ba6deb6d69309d8d7ce789c45f34659"
@@ -180,6 +180,14 @@
   pruneopts = "UT"
   revision = "390ab7935ee28ec6b286364bba9b4dd6410cb3d5"
   version = "v0.3.0"
+
+[[projects]]
+  digest = "1:586ea76dbd0374d6fb649a91d70d652b7fe0ccffb8910a77468e7702e7901f3d"
+  name = "github.com/go-stack/stack"
+  packages = ["."]
+  pruneopts = "UT"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
 
 [[projects]]
   digest = "1:35621fe20f140f05a0c4ef662c26c0ab4ee50bca78aa30fe87d33120bd28165e"
@@ -1044,6 +1052,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/btcsuite/btcd/btcec",
     "github.com/fsouza/go-dockerclient",
     "github.com/gogo/protobuf/proto",
     "github.com/golang/protobuf/proto",
