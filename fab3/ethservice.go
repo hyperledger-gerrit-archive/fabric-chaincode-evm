@@ -70,6 +70,7 @@ type LedgerClient interface {
 type EthService interface {
 	GetCode(r *http.Request, arg *string, reply *string) error
 	Call(r *http.Request, args *types.EthArgs, reply *string) error
+	SendRawTransaction(r *http.Request, args *string, reply *string) error
 	SendTransaction(r *http.Request, args *types.EthArgs, reply *string) error
 	GetTransactionReceipt(r *http.Request, arg *string, reply *types.TxReceipt) error
 	Accounts(r *http.Request, arg *string, reply *[]string) error
@@ -130,6 +131,20 @@ func (s *ethService) Call(r *http.Request, args *types.EthArgs, reply *string) e
 	// Clients expect the prefix to present in responses
 	*reply = "0x" + hex.EncodeToString(response.Payload)
 
+	return nil
+}
+
+func (s *ethService) SendRawTransaction(r *http.Request, raw *string, reply *string) error {
+	response, err := s.channelClient.Execute(channel.Request{
+		ChaincodeID: s.ccid,
+		Fcn:         "rawTransaction",
+		Args:        [][]byte{[]byte(*raw)},
+	})
+
+	if err != nil {
+		return fmt.Errorf("Failed to execute transaction: %s", err)
+	}
+	*reply = string(response.TransactionID)
 	return nil
 }
 
@@ -658,22 +673,33 @@ func getTransactionInformation(payload *common.Payload) (string, string, string,
 		return "", "", "", respPayload, nil
 	}
 
-	sigHdr := &common.SignatureHeader{}
-	if err := proto.Unmarshal(payload.GetHeader().GetSignatureHeader(), sigHdr); err != nil {
-		return "", "", "", nil, fmt.Errorf("Failed unmarshaling signature header: %s", err)
+	if string(args[0]) != "rawTransaction" {
+		sigHdr := &common.SignatureHeader{}
+		if err := proto.Unmarshal(payload.GetHeader().GetSignatureHeader(), sigHdr); err != nil {
+			return "", "", "", nil, fmt.Errorf("Failed unmarshaling signature header: %s", err)
+		}
+
+		from, err := address.IdentityToAddr(sigHdr.GetCreator())
+		if err != nil {
+			return "", "", "", nil, fmt.Errorf("Failed generating from address: %s", err)
+		}
+
+		// At this point, this is either an EVM Contract Deploy,
+		// or an EVM Contract Invoke. We don't care about the
+		// specific case, fill in the fields directly.
+
+		// First arg is to and second arg is the input data
+		return string(args[0]), string(args[1]), "0x" + hex.EncodeToString(from), respPayload, nil
 	}
 
-	from, err := address.IdentityToAddr(sigHdr.GetCreator())
+	var tx types.SignedTx
+	b, _ := hex.DecodeString(string(args[1]))
+	err = tx.Decode(b)
 	if err != nil {
-		return "", "", "", nil, fmt.Errorf("Failed generating from address: %s", err)
+		return "", "", "", nil, fmt.Errorf("Failed to decode raw transaction: %s", err)
 	}
 
-	// At this point, this is either an EVM Contract Deploy,
-	// or an EVM Contract Invoke. We don't care about the
-	// specific case, fill in the fields directly.
-
-	// First arg is to and second arg is the input data
-	return string(args[0]), string(args[1]), "0x" + hex.EncodeToString(from), respPayload, nil
+	return tx.CallerAddress(), hex.EncodeToString(tx.Payload), tx.CallerAddress(), respPayload, nil
 }
 
 // findTransaction takes in the txId and  block data from block.GetData().GetData() where block is of type *common.Block
